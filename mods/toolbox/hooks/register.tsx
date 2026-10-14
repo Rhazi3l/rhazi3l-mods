@@ -1,4 +1,4 @@
-// The toolbox: a "◆ toolbox ▾" button at the right of the prompt footer that
+// The Toolbox: a "◆ Toolbox ▾" button at the right of the prompt footer that
 // opens a small panel in the corner above it for the model, effort and the
 // other mods that are installed. Usage figures belong in Claude Code's own
 // status line setting, not here.
@@ -15,7 +15,7 @@ const EMPTY_INFO: ToolboxInfo = { model: '', effort: null }
 const toolboxInfoAtom = atom({ plugin: 'toolbox', key: 'toolboxInfo' } as const, EMPTY_INFO)
 
 const LABEL_WIDTH = 8
-const INSTALL_HINT = 'Clean View: `/plugin install clean-view --marketplace Rhazi3l/rhazi3l-mods`, Prompt Upgrade: `/plugin install prompt-upgrade --marketplace Rhazi3l/rhazi3l-mods`'
+const INSTALL_HINT = 'Clean View: `/plugin install clean-view --marketplace Rhazi3l/rhazi3l-mods`, Upgrade prompt: `/plugin install prompt-upgrade --marketplace Rhazi3l/rhazi3l-mods`'
 
 /** A sibling mod the toolbox can switch: it owns its on/off value and a command that takes `on` and `off`. */
 type SiblingMod = { id: string; name: string; command: string; description: string }
@@ -29,9 +29,9 @@ const CLEAN_VIEW: SiblingMod = {
 
 const PROMPT_UPGRADE: SiblingMod = {
   id: 'prompt-upgrade',
-  name: 'Prompt Upgrade',
+  name: 'Upgrade prompt',
   command: 'better',
-  description: '/better turns a rough prompt into a clearer one; nothing is sent until you press Run it',
+  description: 'An Upgrade prompt button beside the Toolbox; nothing is sent until you press Run it',
 }
 
 const SIBLINGS = [CLEAN_VIEW, PROMPT_UPGRADE]
@@ -77,7 +77,7 @@ export const register: Register = on => {
       })
       await $.command.register({
         name: 'toolbox',
-        description: 'Open or close the toolbox: model, effort and mods',
+        description: 'Open or close the Toolbox: model, effort and mods',
         immediate: true,
       })
     } catch {
@@ -137,14 +137,18 @@ export const register: Register = on => {
   })
 
   // The footer button, beside the engine's own mode labels.
-  on('ui.render', { component: 'SessionMode' }, async ($, e) => {
+  on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const isOpen = await read($, toolboxOpenAtom)
     const modes = e.props.modes.join(' & ')
+    // Other mods' footer buttons (Upgrade prompt's) draw to the left of this one. The modes are
+    // drawn here, so the rest of the chain gets none and they are not drawn twice.
+    const others = await next({ ...e, props: { ...e.props, modes: [] } })
 
     return (
       <Box flexDirection="row">
         {modes !== '' && <Text dimColor>{`${modes}  `}</Text>}
+        {others}
         <Button
           key="toolbox"
           plain
@@ -152,7 +156,7 @@ export const register: Register = on => {
         >
           <Text color="claude">{'◆ '}</Text>
           <Text color={isOpen ? 'claude' : 'text'} bold={isOpen}>
-            toolbox
+            Toolbox
           </Text>
           <Text color={isOpen ? 'claude' : 'inactive'}>{isOpen ? ' ▴' : ' ▾'}</Text>
         </Button>
@@ -197,7 +201,7 @@ export const register: Register = on => {
           <Box flexDirection="row" justifyContent="space-between">
             <Box flexGrow={1} flexShrink={1}>
               <Text bold color="claude" wrap="truncate-end">
-                ◆ toolbox
+                ◆ Toolbox
               </Text>
             </Box>
             <Box flexShrink={0}>

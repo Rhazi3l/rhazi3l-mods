@@ -20,7 +20,7 @@ export type UpgradeFlow = {
 declare module 'claude-code' {
   interface PluginState {
     'prompt-upgrade': {
-      /** Whether /better works. Other mods (the toolbox) read it; only Prompt Upgrade writes it. */
+      /** Whether the Upgrade prompt button shows. Other mods (the toolbox) read it; only Prompt Upgrade writes it. */
       isOn: boolean
       flow: UpgradeFlow
     }

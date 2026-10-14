@@ -13,6 +13,8 @@ const PANE = {
   props: { title: 'Prompt Upgrade', isFocused: true, bodyColumns: 90, placement: 'inline', scroll: { offset: 0, bodyRows: 40 }, view: {} },
 } as const
 
+const FOOTER = { plugin: 'prompt-upgrade', component: 'SessionMode', props: { modes: [] } } as const
+
 const ROUGH = 'make me a landing page for my bakery'
 const ANSWER = JSON.stringify({
   prompt: 'Build a one-page landing page for my bakery, for local customers, in plain HTML and CSS. Done means it opens in a browser. Opening hours: [opening hours].',
@@ -20,8 +22,10 @@ const ANSWER = JSON.stringify({
 })
 
 let clock: MockClock
+/** What is typed in the prompt box. */
+let draft = ''
 
-type Seen = { submitted: string[]; closed: string[]; modelCalls: number; toasts: string[] }
+type Seen = { submitted: string[]; closed: string[]; modelCalls: number; toasts: string[]; filled: string[] }
 
 /** The engine's own answers beneath the plugin. */
 async function startSession(
@@ -30,14 +34,21 @@ async function startSession(
   reply: () => unknown = () => ({ isAnswered: true, text: ANSWER }),
   placed: unknown = { isPlaced: true },
 ) {
-  const seen: Seen = { submitted: [], closed: [], modelCalls: 0, toasts: [] }
+  const seen: Seen = { submitted: [], closed: [], modelCalls: 0, toasts: [], filled: [] }
+  draft = ''
   clock = mock.clock(on, { now: 1_000_000 })
   mock.store(on)
   on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('ui.render', { component: 'SessionMode' }, ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box />
+  })
   on('ui.open', () => ({ value: placed }) as never)
   on('ui.close', ($, e) => (seen.closed.push(e.id), { value: undefined }) as never)
   on('ui.toast', ($, e) => (seen.toasts.push(String(e.text)), { value: undefined }) as never)
   on('model.complete', () => (seen.modelCalls++, { value: reply() }) as never)
+  on('prompt.read', () => ({ value: { text: draft, cursor: draft.length } }) as never)
+  on('prompt.fill', ($, e) => (seen.filled.push(e.text), { isFilled: true }) as never)
   on('prompt.submit', ($, e) => (seen.submitted.push(e.text), { text: e.text }) as never)
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
   return seen
@@ -175,15 +186,72 @@ describe('the /better flow', () => {
   })
 })
 
-describe('on and off', () => {
-  test('/better off stops it asking the model, /better on brings it back, and bare /better says how to use it', async ($, on) => {
+describe('the Upgrade prompt button', () => {
+  test('it sits in the prompt footer on both surfaces, and pressing it upgrades what is typed', async ($, on) => {
     const seen = await startSession($, on)
-    expect((await $.command.run({ command: 'better', args: '', ...RUN })).text).toContain('Type /better')
-    expect((await $.command.run({ command: 'better', args: 'off', ...RUN })).text).toBe('Prompt Upgrade is off.')
-    expect((await better($, ROUGH)).text).toContain('is off')
+    draft = ROUGH
+    for (const surface of SURFACES) {
+      const band = await $.ui.mount({ ...FOOTER, surface })
+      expect(await band.find({ key: 'pu-upgrade' })).toBeDefined()
+      await band.unmount()
+    }
+    const band = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
+    await band.press({ key: 'pu-upgrade' })
+    await clock.advance(10)
+    expect(seen.modelCalls).toBe(1)
+    const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    expect(await pane.find({ type: 'Text', text: ROUGH })).toBeDefined()
+    await band.unmount()
+    await pane.unmount()
+  })
+
+  test('with nothing typed, it asks the model nothing and says what to do', async ($, on) => {
+    const seen = await startSession($, on)
+    draft = '   '
+    const band = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
+    await band.press({ key: 'pu-upgrade' })
+    await clock.advance(10)
     expect(seen.modelCalls).toBe(0)
-    expect((await $.command.run({ command: 'better', args: 'on', ...RUN })).text).toBe('Prompt Upgrade is on.')
+    expect(seen.toasts.join(' ')).toContain('Type a prompt first')
+    await band.unmount()
+  })
+
+  test('Run it sends the upgrade and clears the draft it came from, but leaves a changed draft alone', async ($, on) => {
+    const seen = await startSession($, on)
+    draft = ROUGH
+    await better($, ROUGH)
+    const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    await pane.press({ key: 'pu-run' })
+    expect(seen.filled).toEqual([''])
+    await pane.unmount()
+
+    seen.filled.length = 0
+    await better($, ROUGH)
+    draft = 'something else I started typing'
+    const again = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    await again.press({ key: 'pu-run' })
+    expect(seen.filled).toEqual([])
+    await again.unmount()
+  })
+
+  test('off hides the footer button and on brings it back; /better with a prompt works either way', async ($, on) => {
+    const seen = await startSession($, on)
+    expect((await $.command.run({ command: 'better', args: 'off', ...RUN })).text).toBe('The Upgrade prompt button is off.')
+    const off = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
+    expect(await off.find({ key: 'pu-upgrade' })).toBeUndefined()
+    await off.unmount()
+    expect(seen.modelCalls).toBe(0)
     await better($, ROUGH)
     expect(seen.modelCalls).toBe(1)
+
+    expect((await $.command.run({ command: 'better', args: 'on', ...RUN })).text).toBe('The Upgrade prompt button is on.')
+    const shown = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
+    expect(await shown.find({ key: 'pu-upgrade' })).toBeDefined()
+    await shown.unmount()
+  })
+
+  test('bare /better says how to use the button', async ($, on) => {
+    await startSession($, on)
+    expect((await $.command.run({ command: 'better', args: '', ...RUN })).text).toContain('Upgrade prompt')
   })
 })

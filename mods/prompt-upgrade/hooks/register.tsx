@@ -1,5 +1,6 @@
-// Prompt Upgrade: `/better <rough prompt>` rewrites a prompt into a clearer one
-// and shows both in a pane. Nothing is sent until the person presses Run it.
+// Prompt Upgrade: the "✦ Upgrade prompt" button above the prompt (or
+// `/better <rough prompt>`) rewrites the prompt into a clearer one and shows both
+// in a pane. Nothing is sent until the person presses Run it.
 // Opt in per prompt, one fast-model call, no history kept.
 // Colours are theme keys and layout is boxes that wrap, so it follows the theme
 // and draws the same in the terminal and the desktop app.
@@ -17,10 +18,12 @@ const NARROW = 70
 
 const IDLE: UpgradeFlow = { phase: 'idle', original: '', upgraded: '', added: [], isEditing: false, note: '', runId: 0 }
 
+// Whether the footer button shows. The toolbox switches it; `/better <prompt>` works either way.
 const isOnAtom = atom({ plugin: 'prompt-upgrade', key: 'isOn' } as const, true)
 const flowAtom = atom({ plugin: 'prompt-upgrade', key: 'flow' } as const, IDLE)
 
-const USAGE = 'Type /better and your rough prompt. A pane shows the upgrade beside it, and nothing is sent until you press Run it.'
+const USAGE =
+  'Type your prompt, then press the Upgrade prompt button above it (or type /better and the prompt). A pane shows the upgrade beside it, and nothing is sent until you press Run it.'
 
 /** Shows the failure card; the person's prompt is still kept. */
 async function fail($: EngineInterface, runId: number, note: string) {
@@ -64,7 +67,10 @@ async function send($: EngineInterface, text: string) {
   const sent = text.trim()
   if (sent === '') return
   try {
+    const { original } = await read($, flowAtom)
     await finish($)
+    // The draft the upgrade came from would otherwise stay in the box; only clear it if it is still that draft.
+    if ((await $.prompt.read()).text.trim() === original.trim()) await $.prompt.fill({ text: '' })
     // As the person's own words, so the model reads it without a "plugin sent a message" frame.
     void $.prompt.submit({ text: sent, asUser: true })
   } catch {
@@ -75,7 +81,7 @@ async function send($: EngineInterface, text: string) {
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const saved = await $.store.get(STORE_ON)
-    // Written even when unchanged, so other mods can tell Prompt Upgrade is installed.
+    // Written even when unchanged, so the toolbox can tell Prompt Upgrade is installed.
     await update($, isOnAtom, () => (typeof saved === 'boolean' ? saved : true))
     try {
       await $.command.register({
@@ -92,20 +98,49 @@ export const register: Register = on => {
 
   on('command.run', { command: 'better' }, async ($, e) => {
     const args = e.args.trim()
-    const isOn = await read($, isOnAtom)
+    // `on` and `off` are the toolbox's switch for the footer button, so they are never taken as a prompt.
     if (args.toLowerCase() === 'on' || args.toLowerCase() === 'off') {
       const turnsOn = args.toLowerCase() === 'on'
       await update($, isOnAtom, () => turnsOn)
       await $.store.set(STORE_ON, turnsOn)
-      return { text: `Prompt Upgrade is ${turnsOn ? 'on' : 'off'}.` }
+      return { text: `The Upgrade prompt button is ${turnsOn ? 'on' : 'off'}.` }
     }
-    if (!isOn) return { text: 'Prompt Upgrade is off. Type /better on to turn it back on.' }
     if (args === '') return { text: USAGE }
     // A command answers at once; the pane and the model call follow in the background.
     $.clock.after(0, () => {
       void upgrade($, args)
     })
     return { text: 'Upgrading your prompt. The pane shows it when it is ready.' }
+  })
+
+  // The footer button, to the left of the toolbox's (which draws whatever this returns): upgrades what is typed in the box.
+  on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
+    const rest = await next(e)
+    if (!(await read($, isOnAtom))) return rest
+    const { Box, Text, Button } = $.ui.resolve(e)
+    return (
+      <Box flexDirection="row">
+        <Box key="pu-footer" marginRight={2}>
+          <Button
+            key="pu-upgrade"
+            plain
+            onPress={async () => {
+              try {
+                const draft = (await $.prompt.read()).text.trim()
+                if (draft === '') return $.ui.toast('Type a prompt first, then press Upgrade prompt.')
+                void upgrade($, draft)
+              } catch {
+                $.ui.toast("Couldn't read your prompt.")
+              }
+            }}
+          >
+            <Text color="claude">{'✦ '}</Text>
+            <Text>Upgrade prompt</Text>
+          </Button>
+        </Box>
+        {rest}
+      </Box>
+    )
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
