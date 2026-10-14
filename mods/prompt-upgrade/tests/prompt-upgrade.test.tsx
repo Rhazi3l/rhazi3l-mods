@@ -187,22 +187,20 @@ describe('the /better flow', () => {
 })
 
 describe('the footer button on each surface', () => {
-  test('the terminal names it; elsewhere the star stands alone so the Toolbox keeps its room', async ($, on) => {
+  test('both surfaces name it with one short word, so the Info button keeps its room', async ($, on) => {
     await startSession($, on)
     const term = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
-    expect(await term.find({ key: 'pu-upgrade' })).toMatchObject({ text: expect.stringContaining('Upgrade prompt') })
+    expect(await term.find({ key: 'pu-upgrade' })).toMatchObject({ text: '✦ Better' })
     await term.unmount()
     const desk = await $.ui.mount({ ...FOOTER, surface: 'desktop' })
     const button = await desk.find({ key: 'pu-upgrade' })
-    expect(button).toBeDefined()
-    expect(button?.text).not.toContain('Upgrade prompt')
-    expect(button?.text).toContain('✦')
+    expect(button).toMatchObject({ text: '✦ Better' })
     expect(await desk.find({ key: 'pu-footer' })).toMatchObject({ props: { flexShrink: 0 } })
     await desk.unmount()
   })
 })
 
-describe('the Upgrade prompt button', () => {
+describe('the Better button', () => {
   test('it sits in the prompt footer on both surfaces, and pressing it upgrades what is typed', async ($, on) => {
     const seen = await startSession($, on)
     draft = ROUGH
@@ -252,7 +250,7 @@ describe('the Upgrade prompt button', () => {
 
   test('off hides the footer button and on brings it back; /better with a prompt works either way', async ($, on) => {
     const seen = await startSession($, on)
-    expect((await $.command.run({ command: 'better', args: 'off', ...RUN })).text).toBe('The Upgrade prompt button is off.')
+    expect((await $.command.run({ command: 'better', args: 'off', ...RUN })).text).toBe('The Better button is off.')
     const off = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
     expect(await off.find({ key: 'pu-upgrade' })).toBeUndefined()
     await off.unmount()
@@ -260,7 +258,7 @@ describe('the Upgrade prompt button', () => {
     await better($, ROUGH)
     expect(seen.modelCalls).toBe(1)
 
-    expect((await $.command.run({ command: 'better', args: 'on', ...RUN })).text).toBe('The Upgrade prompt button is on.')
+    expect((await $.command.run({ command: 'better', args: 'on', ...RUN })).text).toBe('The Better button is on.')
     const shown = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
     expect(await shown.find({ key: 'pu-upgrade' })).toBeDefined()
     await shown.unmount()
@@ -268,6 +266,6 @@ describe('the Upgrade prompt button', () => {
 
   test('bare /better says how to use the button', async ($, on) => {
     await startSession($, on)
-    expect((await $.command.run({ command: 'better', args: '', ...RUN })).text).toContain('Upgrade prompt')
+    expect((await $.command.run({ command: 'better', args: '', ...RUN })).text).toContain('Better')
   })
 })

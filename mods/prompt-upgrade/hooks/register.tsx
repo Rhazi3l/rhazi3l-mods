@@ -1,4 +1,4 @@
-// Prompt Upgrade: the "✦ Upgrade prompt" button above the prompt (or
+// Prompt Upgrade: the "✦ Better" button above the prompt (or
 // `/better <rough prompt>`) rewrites the prompt into a clearer one and shows both
 // in a pane. Nothing is sent until the person presses Run it.
 // Opt in per prompt, one fast-model call, no history kept.
@@ -23,7 +23,7 @@ const isOnAtom = atom({ plugin: 'prompt-upgrade', key: 'isOn' } as const, true)
 const flowAtom = atom({ plugin: 'prompt-upgrade', key: 'flow' } as const, IDLE)
 
 const USAGE =
-  'Type your prompt, then press the Upgrade prompt button above it (or type /better and the prompt). A pane shows the upgrade beside it, and nothing is sent until you press Run it.'
+  'Type your prompt, then press the ✦ Better button above it (or type /better and the prompt). A pane shows the upgrade beside it, and nothing is sent until you press Run it.'
 
 /** Shows the failure card; the person's prompt is still kept. */
 async function fail($: EngineInterface, runId: number, note: string) {
@@ -103,7 +103,7 @@ export const register: Register = on => {
       const turnsOn = args.toLowerCase() === 'on'
       await update($, isOnAtom, () => turnsOn)
       await $.store.set(STORE_ON, turnsOn)
-      return { text: `The Upgrade prompt button is ${turnsOn ? 'on' : 'off'}.` }
+      return { text: `The Better button is ${turnsOn ? 'on' : 'off'}.` }
     }
     if (args === '') return { text: USAGE }
     // A command answers at once; the pane and the model call follow in the background.
@@ -118,28 +118,26 @@ export const register: Register = on => {
     const rest = await next(e)
     if (!(await read($, isOnAtom))) return rest
     const { Box, Text, Button } = $.ui.resolve(e)
-    // The footer has little room beside the Toolbox button, and the desktop app clips what
-    // does not fit at the right, which hid the Toolbox. Off the terminal the label is dropped
-    // and the star stands alone; the Toolbox's Mods row names it in full.
-    const isTerminal = e.surface === 'terminal'
+    // The footer has little room beside the Info button, and the desktop app clips what does
+    // not fit at the right, so the label stays short.
     return (
       <Box flexDirection="row">
-        <Box key="pu-footer" marginRight={isTerminal ? 2 : 1} flexShrink={0}>
+        <Box key="pu-footer" marginRight={1} flexShrink={0}>
           <Button
             key="pu-upgrade"
             plain
             onPress={async () => {
               try {
                 const draft = (await $.prompt.read()).text.trim()
-                if (draft === '') return $.ui.toast('Type a prompt first, then press Upgrade prompt.')
+                if (draft === '') return $.ui.toast('Type a prompt first, then press Better.')
                 void upgrade($, draft)
               } catch {
                 $.ui.toast("Couldn't read your prompt.")
               }
             }}
           >
-            <Text color="claude">{isTerminal ? '✦ ' : '✦'}</Text>
-            {isTerminal && <Text>Upgrade prompt</Text>}
+            <Text color="claude">{'✦ '}</Text>
+            <Text>Better</Text>
           </Button>
         </Box>
         {rest}

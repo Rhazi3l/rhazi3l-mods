@@ -157,7 +157,7 @@ describe('toolbox', () => {
     expect(toasts).toContain('Clean View is off.')
   })
 
-  test('the footer draws the modes once and other mods\' buttons to the left of the toolbox button', async ($, on) => {
+  test('the footer draws the modes once and other mods\' buttons to the left of the Info button', async ($, on) => {
     await startSession($, on)
     for (const surface of SURFACES) {
       const footer = await $.ui.mount({ ...FOOTER, surface, props: { modes: ['focus'] } })
@@ -165,15 +165,15 @@ describe('toolbox', () => {
       expect(await footer.find({ type: 'Text', text: 'engine focus' })).toBeUndefined()
       const tree = JSON.stringify(await footer.find({ type: 'Box' }))
       expect(tree.indexOf('sibling button')).toBeGreaterThan(-1)
-      expect(tree.indexOf('sibling button')).toBeLessThan(tree.indexOf('Toolbox'))
+      expect(tree.indexOf('sibling button')).toBeLessThan(tree.indexOf('Info'))
       await footer.unmount()
     }
   })
 
-  test('the footer reads Toolbox; the corner panel has no usage; effort runs /effort', async ($, on) => {
+  test('the footer reads Info; the corner panel has no usage; effort runs /effort', async ($, on) => {
     const ran = await startSession($, on)
     const footer = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
-    expect(await footer.find({ type: 'Text', text: 'Toolbox' })).toBeDefined()
+    expect(await footer.find({ type: 'Text', text: 'Info' })).toBeDefined()
     expect(await footer.find({ type: 'Text', text: ' ▾' })).toBeDefined()
 
     await footer.press({ key: 'toolbox' })
@@ -189,7 +189,7 @@ describe('toolbox', () => {
     await band.unmount()
   })
 
-  test('with Upgrade prompt installed too, it gets its own button that runs /better off', async ($, on) => {
+  test('with Better installed too, it gets its own button that runs /better off', async ($, on) => {
     const ran: string[] = []
     fakeMod(on, ran, [
       { id: 'clean-view', command: 'view' },
@@ -201,7 +201,7 @@ describe('toolbox', () => {
     for (const surface of SURFACES) {
       const band = await $.ui.mount({ ...BAND, surface })
       expect(await band.find({ key: 'mod-clean-view' })).toMatchObject({ text: '● Clean View' })
-      expect(await band.find({ key: 'mod-prompt-upgrade' })).toMatchObject({ text: '● Upgrade prompt' })
+      expect(await band.find({ key: 'mod-prompt-upgrade' })).toMatchObject({ text: '● Better' })
       await band.unmount()
     }
     const band = await $.ui.mount({ ...BAND, surface: 'terminal' })

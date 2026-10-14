@@ -1,4 +1,4 @@
-// The Toolbox: a "◆ Toolbox ▾" button at the right of the prompt footer that
+// Info: a "◆ Info ▾" button at the right of the prompt footer that
 // opens a small panel in the corner above it for the model, effort and the
 // other mods that are installed. Usage figures belong in Claude Code's own
 // status line setting, not here.
@@ -15,7 +15,7 @@ const EMPTY_INFO: ToolboxInfo = { model: '', effort: null }
 const toolboxInfoAtom = atom({ plugin: 'toolbox', key: 'toolboxInfo' } as const, EMPTY_INFO)
 
 const LABEL_WIDTH = 8
-const INSTALL_HINT = 'Clean View: `/plugin install clean-view --marketplace Rhazi3l/rhazi3l-mods`, Upgrade prompt: `/plugin install prompt-upgrade --marketplace Rhazi3l/rhazi3l-mods`'
+const INSTALL_HINT = 'Clean View: `/plugin install clean-view --marketplace Rhazi3l/rhazi3l-mods`, Better: `/plugin install prompt-upgrade --marketplace Rhazi3l/rhazi3l-mods`'
 
 /** A sibling mod the toolbox can switch: it owns its on/off value and a command that takes `on` and `off`. */
 type SiblingMod = { id: string; name: string; command: string; description: string }
@@ -29,9 +29,9 @@ const CLEAN_VIEW: SiblingMod = {
 
 const PROMPT_UPGRADE: SiblingMod = {
   id: 'prompt-upgrade',
-  name: 'Upgrade prompt',
+  name: 'Better',
   command: 'better',
-  description: 'An Upgrade prompt button beside the Toolbox; nothing is sent until you press Run it',
+  description: 'A ✦ Better button beside Info that rewrites the prompt you typed; nothing is sent until you press Run it',
 }
 
 const SIBLINGS = [CLEAN_VIEW, PROMPT_UPGRADE]
@@ -77,7 +77,7 @@ export const register: Register = on => {
       })
       await $.command.register({
         name: 'toolbox',
-        description: 'Open or close the Toolbox: model, effort and mods',
+        description: 'Open or close the Info panel: model, effort and mods',
         immediate: true,
       })
     } catch {
@@ -113,7 +113,7 @@ export const register: Register = on => {
 
   on('command.run', { command: 'toolbox' }, async $ => {
     const isOpen = await update($, toolboxOpenAtom, open => !open)
-    return { text: isOpen ? 'Toolbox open above the prompt.' : 'Toolbox closed.' }
+    return { text: isOpen ? 'Info open above the prompt.' : 'Info closed.' }
   })
 
   on('command.run', { command: 'mods' }, async ($, e) => {
@@ -141,7 +141,9 @@ export const register: Register = on => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const isOpen = await read($, toolboxOpenAtom)
     const modes = e.props.modes.join(' & ')
-    // Other mods' footer buttons (Upgrade prompt's) draw to the left of this one. The modes are
+    // The desktop footer has little room, so there the chevron is dropped.
+    const isTerminal = e.surface === 'terminal'
+    // Other mods' footer buttons (Better's) draw to the left of this one. The modes are
     // drawn here, so the rest of the chain gets none and they are not drawn twice.
     const others = await next({ ...e, props: { ...e.props, modes: [] } })
 
@@ -157,9 +159,9 @@ export const register: Register = on => {
           >
             <Text color="claude">{'◆ '}</Text>
             <Text color={isOpen ? 'claude' : 'text'} bold={isOpen}>
-              Toolbox
+              Info
             </Text>
-            <Text color={isOpen ? 'claude' : 'inactive'}>{isOpen ? ' ▴' : ' ▾'}</Text>
+            {isTerminal && <Text color={isOpen ? 'claude' : 'inactive'}>{isOpen ? ' ▴' : ' ▾'}</Text>}
           </Button>
         </Box>
       </Box>
@@ -203,7 +205,7 @@ export const register: Register = on => {
           <Box flexDirection="row" justifyContent="space-between">
             <Box flexGrow={1} flexShrink={1}>
               <Text bold color="claude" wrap="truncate-end">
-                ◆ Toolbox
+                ◆ Info
               </Text>
             </Box>
             <Box flexShrink={0}>

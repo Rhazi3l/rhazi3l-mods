@@ -8,7 +8,7 @@
     {
       "name": "toolbox",
       "source": "./mods/toolbox",
-      "description": "A corner toolbox under the prompt for the model, effort and your other mods."
+      "description": "An Info button under the prompt (the toolbox) for the model, effort and your other mods."
     },
     {
       "name": "clean-view",
@@ -18,7 +18,7 @@
     {
       "name": "prompt-upgrade",
       "source": "./mods/prompt-upgrade",
-      "description": "An Upgrade prompt button beside the Toolbox (or /better) turns a rough prompt into a clearer one. A pane shows both, and nothing is sent until you press Run it."
+      "description": "A Better button beside Info (or /better) turns a rough prompt into a clearer one. A pane shows both, and nothing is sent until you press Run it."
     }
   ]
 }
