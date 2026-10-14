@@ -177,6 +177,24 @@ export function describeAction(tool: string, input: unknown, ownPrefix: string):
       return { icon: '🔍', label: 'Looked for files', detail: String(args.pattern ?? '') }
     case 'AskUserQuestion':
       return { icon: '💬', label: 'Asked you a question', detail: '' }
+    case 'Artifact': {
+      const action = String(args.action ?? 'publish')
+      const labels: Record<string, string> = {
+        publish: args.asset ? 'Uploaded to an artifact' : 'Published an artifact',
+        read: 'Read an artifact',
+        list: 'Listed your artifacts',
+        delete: 'Deleted an artifact',
+        open: 'Opened an artifact',
+        pin: 'Pinned an artifact',
+        unpin: 'Unpinned an artifact',
+        quickstart: 'Looked up artifact types',
+      }
+      return { icon: '📎', label: labels[action] ?? 'Used artifacts', detail: shortUrl(args.url ?? args.file_path) }
+    }
+    case 'ArtifactData':
+      return { icon: '📎', label: "Used an artifact's data", detail: `${String(args.action ?? '')} ${String(args.collection ?? '')}`.trim() }
+    case 'ArtifactComments':
+      return { icon: '📎', label: "Used an artifact's comments", detail: String(args.action ?? '') }
   }
 
   const [, server, name] = /^mcp__(.+?)__(.+)$/.exec(tool) ?? []
@@ -187,7 +205,13 @@ export function describeAction(tool: string, input: unknown, ownPrefix: string):
       detail: `${serverName(server)} → ${words(name)}`,
     }
   }
-  return { icon: '⚙️', label: 'Used a tool', detail: tool }
+  return { icon: '⚙️', label: 'Used a tool', detail: spaced(tool) }
+}
+
+/** A CamelCase tool name in words: "ArtifactData" → "Artifact data". */
+function spaced(name: string): string {
+  const spacedOut = name.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+  return spacedOut.charAt(0) + spacedOut.slice(1).toLowerCase()
 }
 
 /** Collapses whitespace and cuts to `max` characters, for the Details pane. */
@@ -224,6 +248,8 @@ export function describeFull(tool: string, input: unknown): string {
       return oneLine(args.prompt, 300)
     case 'Skill':
       return oneLine(args.args, 300)
+    case 'Artifact':
+      return String(args.url ?? args.file_path ?? '')
   }
   if (tool.startsWith('mcp__')) return tool
   return ''

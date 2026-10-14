@@ -98,6 +98,16 @@ describe('plain names', () => {
     expect(describeAction('Bash', { command: 'git push origin main', description: 'Push the config' }, PREFIX)?.detail).toBe(
       'Push the config (git push)',
     )
+    expect(describeAction('Artifact', { action: 'read', url: 'https://claude.ai/artifact/7UE1qe7SS7CN2KMjmWHeDG' }, PREFIX)).toMatchObject({
+      label: 'Read an artifact',
+      detail: 'claude.ai/artifact/7UE1qe7SS7CN2KMjmWHeDG',
+    })
+    expect(describeAction('Artifact', { file_path: '/tmp/page.html' }, PREFIX)?.label).toBe('Published an artifact')
+    expect(describeAction('ArtifactData', { action: 'query', collection: 'notes' }, PREFIX)).toMatchObject({
+      label: "Used an artifact's data",
+      detail: 'query notes',
+    })
+    expect(describeAction('SomeNewTool', {}, PREFIX)).toMatchObject({ label: 'Used a tool', detail: 'Some new tool' })
     expect(describeAction(PLAN, {}, PREFIX)).toBeNull()
     expect(describeAction('TodoWrite', {}, PREFIX)).toBeNull()
   })
