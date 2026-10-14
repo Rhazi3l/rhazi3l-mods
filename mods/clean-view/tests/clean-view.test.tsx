@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { meterCells } from '../hooks/register'
+import { asksSomething, meterCells } from '../hooks/register'
 import { cleanName, describeAction } from '../hooks/text'
 
 const PREFIX = 'mcp__clean-view__'
@@ -251,6 +251,57 @@ describe('checklist', () => {
     expect(await pane.find({ key: 'clean-view-raw' })).toMatchObject({ text: 'Hide tool output' })
     await row.unmount()
     await pane.unmount()
+  })
+})
+
+describe('waiting for you', () => {
+  test('only an answer that asks something reads as waiting', async () => {
+    expect(asksSomething('Done. Want me to push it?')).toBe(true)
+    expect(asksSomething('Which one do you mean?\n\n')).toBe(true)
+    expect(asksSomething('All set.\n\nThe mods are installed.')).toBe(false)
+    expect(asksSomething('Did it work? Yes, it did.')).toBe(false)
+    expect(asksSomething('')).toBe(false)
+  })
+
+  test('an answer with a step left open ends done, unless it asks something', async ($, on) => {
+    await startJob($, on)
+    await $.tool.call({ tool: PLAN, steps: ['Read your notes', 'Report back'] } as never)
+    await $.tool.call({ tool: PROGRESS, task: 'Read your notes', percent: 100 } as never)
+    await $.turn.complete({ turnId: 't1', answer: 'The mods are installed.', reason: 'answer' } as never)
+    const done = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await done.find({ type: 'Text', text: /^✓ All done · / })).toBeDefined()
+    expect(await done.find({ type: 'Text', text: /Needs you/ })).toBeUndefined()
+    await done.unmount()
+
+    await $.prompt.submit({ text: 'Another job', wait: false, origin: RUN.origin })
+    await $.turn.start({ text: 'Another job', turnId: 't2' })
+    await $.tool.call({ tool: PLAN, steps: ['Look at it', 'Report back'] } as never)
+    await $.turn.complete({ turnId: 't2', answer: 'Which one should I use?', reason: 'answer' } as never)
+    const asking = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await asking.find({ type: 'Text', text: /Needs you/ })).toBeDefined()
+    await asking.unmount()
+  })
+})
+
+describe('tool summaries', () => {
+  test('a folded tool group is hidden on the terminal and unfolded into hidden rows elsewhere', async ($, on) => {
+    on('ui.render', { component: 'ToolGroup' }, ($, e) => {
+      const { Text } = $.ui.resolve(e)
+      return <Text>{e.props.isExpanded ? 'expanded' : 'Ran 2 commands'}</Text>
+    })
+    await startJob($, on)
+    const props = {
+      calls: [{ tool: 'Bash', input: {}, isRunning: false, isErrored: true, isInterrupted: false }],
+      isActive: false,
+      isExpanded: false,
+    }
+    const term = await $.ui.mount({ plugin: 'clean-view', component: 'ToolGroup', surface: 'terminal', props } as never)
+    expect(await term.find({ type: 'Text' })).toBeUndefined()
+    await term.unmount()
+    const desk = await $.ui.mount({ plugin: 'clean-view', component: 'ToolGroup', surface: 'desktop', props } as never)
+    expect(await desk.find({ type: 'Text', text: 'expanded' })).toBeDefined()
+    expect(await desk.find({ type: 'Text', text: 'Ran 2 commands' })).toBeUndefined()
+    await desk.unmount()
   })
 })
 

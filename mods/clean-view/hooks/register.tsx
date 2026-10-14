@@ -81,6 +81,7 @@ const PROMPT_SECTION = `# Clean View checklist
 The person sees a plain-English checklist of your work instead of tool output.
 - For every request, even a quick question, call ${PLAN_TOOL} first with every step of the job in order (2 to 8 steps). If it is deferred, load it with ToolSearch first. If this session has TodoWrite or TaskCreate, your to-do list can serve as the plan instead.
 - Then call ${PROGRESS_TOOL} as real progress happens, and with percent 100 the moment a step finishes.
+- Before your final answer, call ${PROGRESS_TOOL} with percent 100 for every step still open, so the checklist ends complete.
 - Write every step name in plain English a non-technical person understands, under 40 characters, starting with a verb, like "Build the pricing section".
 - Never put file paths, file names, commands, code or tool names in a step name.`
 
@@ -168,6 +169,12 @@ function applyTodos(c: Checklist, todos: readonly Todo[]): Checklist {
     }
   })
   return { ...c, tasks, hasRealPlan: tasks.length > 0 || c.hasRealPlan }
+}
+
+/** Whether the last paragraph of an answer ends in a question, the sign Claude is waiting for the person. */
+export function asksSomething(answer: string): boolean {
+  const last = answer.trim().split(/\n\s*\n/).pop() ?? ''
+  return /\?[\s"'”)*_`]*$/.test(last.trim())
 }
 
 function setNeedsYou(c: Checklist, reason: string): Checklist {
@@ -526,7 +533,9 @@ export const register: Register = on => {
       if (e.reason === 'refusal') return setStuck(c, STUCK_REFUSAL)
       if (e.reason === 'aborted') return { ...c, phase: 'stopped', needsYouReason: null, finishedAt: now }
       if (c.phase === 'stuck' && c.stuckReason === STUCK_REFUSED) return c
-      if (c.hasRealPlan && hasUnfinished(c)) return setNeedsYou(c, REASON_REPLY)
+      // Steps left open at the end of a turn mean Claude is waiting on the person only
+      // when its answer asks something; otherwise it simply answered without ticking them off.
+      if (c.hasRealPlan && hasUnfinished(c) && asksSomething(e.answer)) return setNeedsYou(c, REASON_REPLY)
       const tasks = c.tasks.map(t => ({ ...t, status: 'done' as const, percent: 100 }))
       return { ...c, tasks, phase: 'done', needsYouReason: null, stuckReason: null, finishedAt: now, isCollapsed: false }
     })
@@ -825,8 +834,12 @@ export const register: Register = on => {
     return <Box />
   })
 
+  // A folded group is one summary line (`Ran 2 commands`) the desktop draws
+  // itself around whatever a hook returns, so off the terminal the group is
+  // unfolded into its rows, each of which the ToolUse hook above empties.
   on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
     if (await read($, showsToolRowsAtom)) return next(e)
+    if (e.surface !== 'terminal') return next({ ...e, props: { ...e.props, isExpanded: true } })
     const { Box } = $.ui.resolve(e)
     return <Box />
   })
