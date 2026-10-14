@@ -269,22 +269,34 @@ export function extractQuestion(answer: string): string {
 
 const YES_NO_START = /^(do|does|did|should|shall|can|could|would|will|is|are|want|ok|okay|may)\b|\b(want me to|shall i|should i|ok to|okay to|would you like me to)\b/i
 
+/** Words that ask the person to pick one of several things. */
+const ASKS_TO_CHOOSE = /\b(which|choose|pick|prefer|select|option|number|one of|go with)\b/i
+
+/** The last sentence of the question that ends in a question mark. */
+function lastQuestion(question: string): string {
+  const sentences = question.match(/[^.!?]*\?/g) ?? []
+  return (sentences[sentences.length - 1] ?? question).trim()
+}
+
 /**
- * One-press replies for a question: the numbered options it lists ("1.", "2)"), else
- * Yes and No when it reads as a yes or no question. Empty when neither fits.
+ * One-press replies for the question Claude ended with. A yes or no question gets Yes and
+ * No, whatever else the answer lists. Otherwise a question that asks to choose gets the
+ * numbered options the answer lists ("1.", "2)"). A numbered list the question does not
+ * ask about (steps, findings, things to drop) gets nothing. Empty when neither fits.
  */
 export function quickReplies(answer: string): { label: string; text: string }[] {
-  const numbers = [...answer.matchAll(/^\s*(\d{1,2})[.)]\s+\S/gm)].map(match => Number(match[1]))
-  const options: number[] = []
-  for (const n of numbers) if (n === options.length + 1) options.push(n)
-  if (options.length >= 2 && options.length <= 5) {
-    return options.map(n => ({ label: `Option ${n}`, text: `Option ${n}` }))
-  }
-  if (YES_NO_START.test(extractQuestion(answer).replace(/^…/, ''))) {
+  const question = extractQuestion(answer).replace(/^…/, '')
+  if (YES_NO_START.test(lastQuestion(question))) {
     return [
       { label: 'Yes', text: 'Yes' },
       { label: 'No', text: 'No' },
     ]
+  }
+  const numbers = [...answer.matchAll(/^\s*(\d{1,2})[.)]\s+\S/gm)].map(match => Number(match[1]))
+  const options: number[] = []
+  for (const n of numbers) if (n === options.length + 1) options.push(n)
+  if (options.length >= 2 && options.length <= 5 && ASKS_TO_CHOOSE.test(question)) {
+    return options.map(n => ({ label: `Option ${n}`, text: `Option ${n}` }))
   }
   return []
 }

@@ -285,6 +285,15 @@ describe('replying to a question', () => {
     expect(quickReplies('1. Only one point.\n\nWhat now?')).toEqual([])
   })
 
+  test('a numbered list that is not the choice gets no option buttons', async () => {
+    const DROP =
+      'Which 4 to drop:\n\n1. Time to resolve. Only 2 checks.\n2. ITIL pushback. Already tested.\n3. Finance email. A near copy.\n4. Priority target. A near copy.\n\nWant the 4 I listed, and the one-line note?'
+    expect(quickReplies(DROP).map(r => r.label)).toEqual(['Yes', 'No'])
+    expect(quickReplies('Steps I took:\n\n1. Read it.\n2. Fixed it.\n\nShould I push?').map(r => r.label)).toEqual(['Yes', 'No'])
+    expect(quickReplies('What I found:\n\n1. A bug.\n2. A typo.\n\nWhat do you think?')).toEqual([])
+    expect(quickReplies('Two ways:\n\n1. Fast.\n2. Careful.\n\nWhich do you prefer?').map(r => r.text)).toEqual(['Option 1', 'Option 2'])
+  })
+
   test('the frame shows the question and a button per reply; pressing one sends it as the next message', async ($, on) => {
     await startJob($, on)
     await $.tool.call({ tool: PLAN, steps: ['Read your notes', 'Report back'] } as never)
