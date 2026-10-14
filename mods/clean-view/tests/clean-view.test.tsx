@@ -295,7 +295,7 @@ describe('replying to a question', () => {
       expect(await ui.find({ key: 'clean-view-question' })).toMatchObject({ text: expect.stringContaining('Which do you want?') })
       expect(await ui.find({ key: 'clean-view-reply-0' })).toMatchObject({ text: 'Option 1', props: { variant: 'primary' } })
       expect(await ui.find({ key: 'clean-view-reply-2' })).toMatchObject({ text: 'Option 3' })
-      expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: PASTEL.waiting } })
+      expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.waiting } })
       expect(await ui.find({ key: 'clean-view-replies' })).toMatchObject({ props: { flexWrap: 'wrap' } })
       await ui.unmount()
     }
@@ -345,7 +345,7 @@ describe('frame colours', () => {
     for (const surface of SURFACES) {
       const pane = await $.ui.mount({ ...LEGEND, surface })
       expect(await pane.find({ key: 'state-working' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.working } })
-      expect(await pane.find({ key: 'state-waiting' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: PASTEL.waiting } })
+      expect(await pane.find({ key: 'state-waiting' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.waiting } })
       expect(await pane.find({ key: 'state-stuck' })).toMatchObject({ props: { borderColor: PASTEL.stuck } })
       expect(await pane.find({ key: 'state-done' })).toMatchObject({ props: { borderColor: PASTEL.done } })
       expect(await pane.find({ key: 'state-stopped' })).toMatchObject({ props: { borderColor: PASTEL.stopped } })
@@ -363,7 +363,7 @@ describe('frame colours', () => {
     await working.unmount()
     await $.turn.complete({ turnId: 't1', answer: 'Which one do you want?', reason: 'answer' } as never)
     const waiting = await $.ui.mount({ ...BAND, surface: 'desktop' })
-    expect(await waiting.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: PASTEL.waiting } })
+    expect(await waiting.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.waiting } })
     expect(await waiting.find({ type: 'Text', text: /^ Needs you $/ })).toMatchObject({ props: { backgroundColor: PASTEL.waiting } })
     await waiting.unmount()
   })

@@ -676,7 +676,6 @@ export const register: Register = on => {
         ]
       : []
     // The frame keeps the checklist apart from the reply; its colour says how the job stands.
-    // A job waiting on the person gets a heavier border, so it stands out from one still working.
     const frameColor =
       c.phase === 'done'
         ? PASTEL.done
@@ -688,7 +687,7 @@ export const register: Register = on => {
               ? PASTEL.stopped
               : PASTEL.working
     const frame = (children: RenderChildren) => (
-      <Box key="clean-view-frame" flexDirection="column" borderStyle={c.phase === 'needsYou' ? 'bold' : 'round'} borderColor={frameColor} paddingX={1}>
+      <Box key="clean-view-frame" flexDirection="column" borderStyle="round" borderColor={frameColor} paddingX={1}>
         {children}
       </Box>
     )
@@ -781,8 +780,8 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: COLOURS_PANE }, async ($, e) => {
     const { Box, Text } = $.ui.resolve(e)
     // One frame as the checklist draws it, with a line on when it appears.
-    const frame = (key: string, borderStyle: 'round' | 'bold', color: string, header: RenderChildren, when: string) => (
-      <Box key={key} flexDirection="column" borderStyle={borderStyle} borderColor={color} paddingX={1}>
+    const frame = (key: string, color: string, header: RenderChildren, when: string) => (
+      <Box key={key} flexDirection="column" borderStyle="round" borderColor={color} paddingX={1}>
         {header}
         <Text dimColor wrap="wrap">
           {when}
@@ -793,14 +792,12 @@ export const register: Register = on => {
       <Box flexDirection="column" gap={1}>
         {frame(
           'state-working',
-          'round',
           PASTEL.working,
           <Text bold color={PASTEL.working} wrap="wrap">{'✱ Working on your request'}</Text>,
           'Orange: Claude is working through the steps.',
         )}
         {frame(
           'state-waiting',
-          'bold',
           PASTEL.waiting,
           <Text wrap="wrap">
             <Text backgroundColor={PASTEL.waiting} color="inverseText" bold>
@@ -812,21 +809,18 @@ export const register: Register = on => {
         )}
         {frame(
           'state-stuck',
-          'round',
           PASTEL.stuck,
           <Text color={PASTEL.stuck} wrap="wrap">{'⚠ Stuck: a step keeps failing'}</Text>,
           'Yellow: a step keeps failing, you refused one, or an error stopped the job.',
         )}
         {frame(
           'state-done',
-          'round',
           PASTEL.done,
           <Text color={PASTEL.done} wrap="wrap">{'✓ All done'}</Text>,
           'Green: the job finished with nothing left to ask.',
         )}
         {frame(
           'state-stopped',
-          'round',
           PASTEL.stopped,
           <Text wrap="wrap">{'■ Stopped · you pressed Esc'}</Text>,
           'Grey: you interrupted the job.',
