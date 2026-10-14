@@ -334,6 +334,47 @@ describe('replying to a question', () => {
   })
 })
 
+describe('the waiting colour', () => {
+  const SWATCHES = { ...PANE, requestId: 'clean-view-colours' } as const
+
+  test('the samples pane shows every colour as a frame with a Use button, on both surfaces', async ($, on) => {
+    on('ui.open', () => ({ value: { isPlaced: true } }))
+    await startJob($, on)
+    expect((await $.command.run({ command: 'view', args: 'colours', ...RUN })).text).toContain('Colour samples open')
+    for (const surface of SURFACES) {
+      const pane = await $.ui.mount({ ...SWATCHES, surface })
+      for (const [name, key] of [['blue', 'permission'], ['cyan', 'suggestion'], ['amber', 'warning'], ['red', 'error'], ['green', 'success'], ['orange', 'claude']]) {
+        expect(await pane.find({ key: `colour-${name}` })).toMatchObject({ props: { borderStyle: 'bold', borderColor: key } })
+        expect(await pane.find({ key: `colour-use-${name}` })).toBeDefined()
+      }
+      expect(await pane.find({ key: 'colour-use-blue' })).toMatchObject({ text: 'blue (in use)' })
+      await pane.unmount()
+    }
+  })
+
+  test('pressing Use changes the frame of a job that is waiting, and /view colour does the same', async ($, on) => {
+    await startJob($, on)
+    await $.turn.complete({ turnId: 't1', answer: 'Which one do you want?', reason: 'answer' } as never)
+    const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await band.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: 'permission' } })
+
+    const pane = await $.ui.mount({ ...SWATCHES, surface: 'terminal' })
+    await pane.press({ key: 'colour-use-cyan' })
+    await pane.unmount()
+    const cyan = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await cyan.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: 'suggestion' } })
+    expect(await cyan.find({ type: 'Text', text: /^ Needs you $/ })).toMatchObject({ props: { backgroundColor: 'suggestion' } })
+    await cyan.unmount()
+
+    expect((await $.command.run({ command: 'view', args: 'colour red', ...RUN })).text).toBe('The waiting frame is now red.')
+    expect((await $.command.run({ command: 'view', args: 'colour pink', ...RUN })).text).toContain('Pick one of')
+    const red = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    expect(await red.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: 'error' } })
+    await red.unmount()
+    await band.unmount()
+  })
+})
+
 describe('waiting for you', () => {
   test('only an answer that asks something reads as waiting', async () => {
     expect(asksSomething('Done. Want me to push it?')).toBe(true)

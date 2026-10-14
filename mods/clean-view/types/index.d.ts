@@ -65,6 +65,8 @@ declare module 'claude-code' {
       tick: number
       /** True while the Details pane has asked for the engine's own tool rows in the transcript. */
       showsRaw: boolean
+      /** The theme colour key of the frame while Claude waits for a reply. */
+      waitColour: string
     }
   }
 }

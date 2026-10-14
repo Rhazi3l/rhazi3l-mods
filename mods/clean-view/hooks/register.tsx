@@ -40,6 +40,7 @@ const COLLAPSE_MS = 5000
 const MAX_ACTIONS = 300
 const DETAILS_PANE = 'clean-view-details'
 const DETAILS_TITLE = 'What Claude did'
+const COLOURS_TITLE = 'Waiting colour'
 const FAILS_BEFORE_STUCK = 3
 
 const REASON_PERMISSION = 'Claude needs your OK to continue'
@@ -69,8 +70,22 @@ const EMPTY: Checklist = {
 // $.store too, so they last past the session; the toolbox reads `isOn`.
 const STORE_ON = 'isOn'
 const STORE_STYLE = 'style'
+const STORE_WAIT_COLOUR = 'waitColour'
+const COLOURS_PANE = 'clean-view-colours'
+/** The theme colours offered for the frame while Claude waits for a reply, by the name the person uses. */
+const WAIT_COLOURS = [
+  { name: 'blue', key: 'permission', note: "the blue of Claude Code's own questions" },
+  { name: 'cyan', key: 'suggestion', note: 'brighter, close to blue' },
+  { name: 'amber', key: 'warning', note: 'the yellow of a stuck job' },
+  { name: 'red', key: 'error', note: 'loudest; reads as an error' },
+  { name: 'green', key: 'success', note: 'the green of a finished job' },
+  { name: 'orange', key: 'claude', note: 'the same as a job in progress' },
+] as const
+const DEFAULT_WAIT_COLOUR = 'permission'
+const isWaitColour = (key: unknown): key is string => WAIT_COLOURS.some(colour => colour.key === key)
 const isOnAtom = atom({ plugin: 'clean-view', key: 'isOn' } as const, true)
 const styleAtom = atom({ plugin: 'clean-view', key: 'style' } as const, 'guided')
+const waitColourAtom = atom({ plugin: 'clean-view', key: 'waitColour' } as const, DEFAULT_WAIT_COLOUR)
 const checklistAtom = atom({ plugin: 'clean-view', key: 'checklist' } as const, EMPTY)
 const tickAtom = atom({ plugin: 'clean-view', key: 'tick' } as const, 0)
 const rawAtom = atom({ plugin: 'clean-view', key: 'showsRaw' } as const, false)
@@ -285,6 +300,8 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const savedOn = await $.store.get(STORE_ON)
     const savedStyle = await $.store.get(STORE_STYLE)
+    const savedColour = await $.store.get(STORE_WAIT_COLOUR)
+    await update($, waitColourAtom, () => (isWaitColour(savedColour) ? savedColour : DEFAULT_WAIT_COLOUR))
     // Written even when unchanged, so other mods can tell Clean View is installed.
     await update($, isOnAtom, () => (typeof savedOn === 'boolean' ? savedOn : true))
     await update($, styleAtom, (): CleanViewStyle => (savedStyle === 'simple' ? 'simple' : 'guided'))
@@ -307,6 +324,22 @@ export const register: Register = on => {
           : `Details will show when there is room (${opened.reason}).`,
       }
     }
+    if (arg === 'colours' || arg === 'colors') {
+      const opened = await $.ui.open({ id: COLOURS_PANE, title: COLOURS_TITLE })
+      return {
+        text: opened.isPlaced
+          ? 'Colour samples open: press Use on the one you want for the waiting frame.'
+          : `The colour samples will show when there is room (${opened.reason}).`,
+      }
+    }
+    const picked = /^colou?r\s+(\w+)$/.exec(arg)
+    if (picked) {
+      const colour = WAIT_COLOURS.find(c => c.name === picked[1])
+      if (!colour) return { text: `Pick one of: ${WAIT_COLOURS.map(c => c.name).join(', ')}.` }
+      await update($, waitColourAtom, () => colour.key)
+      await $.store.set(STORE_WAIT_COLOUR, colour.key)
+      return { text: `The waiting frame is now ${colour.name}.` }
+    }
     if (arg === 'on' || arg === 'off' || arg === 'full') {
       const isOn = arg === 'on'
       await update($, isOnAtom, () => isOn)
@@ -315,7 +348,7 @@ export const register: Register = on => {
     }
     if (arg !== '' && arg !== 'simple' && arg !== 'guided') {
       return {
-        text: 'Use /view simple, /view guided, /view details, /view on or /view off. With nothing after it, /view switches between Simple and Guided.',
+        text: 'Use /view simple, /view guided, /view details, /view colours, /view on or /view off. With nothing after it, /view switches between Simple and Guided.',
       }
     }
     const style = arg === '' ? nextStyle(await read($, styleAtom)) : (arg as CleanViewStyle)
@@ -566,6 +599,7 @@ export const register: Register = on => {
     const below = await next(e)
 
     const { Box, Text, Button } = $.ui.resolve(e)
+    const waitColour = await read($, waitColourAtom)
     const tick = await read($, tickAtom)
     const now = await $.clock.now()
     const style = await read($, styleAtom)
@@ -606,7 +640,7 @@ export const register: Register = on => {
     if (c.phase === 'needsYou') {
       header = (
         <Text wrap="truncate-end">
-          <Text backgroundColor="permission" color="inverseText" bold>
+          <Text backgroundColor={waitColour} color="inverseText" bold>
             {' Needs you '}
           </Text>
           {` ${c.needsYouReason ?? REASON_REPLY}`}
@@ -670,7 +704,7 @@ export const register: Register = on => {
       c.phase === 'done'
         ? 'success'
         : c.phase === 'needsYou'
-          ? 'permission' // the blue Claude Code uses for its own "needs your answer" dialogs, apart from the orange of a job in progress
+          ? waitColour // blue unless the person picked another (/view colours)
           : c.phase === 'stuck'
             ? 'warning'
             : c.phase === 'stopped'
@@ -762,6 +796,49 @@ export const register: Register = on => {
       <Box flexDirection="column">
         {frame([headerRow, ...askRows, overallRow, ...rows])}
         {below}
+      </Box>
+    )
+  })
+
+  // The colour samples: how each choice looks as the waiting frame, with a button to pick it.
+  on('ui.render', { component: 'Pane', requestId: COLOURS_PANE }, async ($, e) => {
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const current = await read($, waitColourAtom)
+    return (
+      <Box flexDirection="column" gap={1}>
+        <Text dimColor wrap="wrap">
+          How each colour looks as the frame while Claude waits for your reply. Press Use on your pick.
+        </Text>
+        {WAIT_COLOURS.map(colour => (
+          <Box
+            key={`colour-${colour.name}`}
+            flexDirection="column"
+            borderStyle="bold"
+            borderColor={colour.key}
+            paddingX={1}
+          >
+            <Box flexDirection="row" flexWrap="wrap" justifyContent="space-between">
+              <Box flexShrink={1}>
+                <Text wrap="wrap">
+                  <Text backgroundColor={colour.key} color="inverseText" bold>
+                    {' Needs you '}
+                  </Text>
+                  {' Claude is waiting for your reply'}
+                </Text>
+              </Box>
+              <Button
+                key={`colour-use-${colour.name}`}
+                label={colour.key === current ? `${colour.name} (in use)` : `Use ${colour.name}`}
+                variant={colour.key === current ? 'primary' : 'secondary'}
+                onPress={async () => {
+                  await update($, waitColourAtom, () => colour.key)
+                  await $.store.set(STORE_WAIT_COLOUR, colour.key)
+                }}
+              />
+            </Box>
+            <Text dimColor wrap="wrap">{`${colour.name}: ${colour.note}`}</Text>
+          </Box>
+        ))}
       </Box>
     )
   })

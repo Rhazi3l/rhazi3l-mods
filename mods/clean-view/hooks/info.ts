@@ -36,7 +36,7 @@ export const COMMANDS: readonly CommandSpec[] = [
   {
     name: 'view',
     description: 'Clean View: Simple or Guided, Details for everything Claude did, or on and off',
-    argumentHint: '[simple|guided|details|on|off]',
+    argumentHint: '[simple|guided|details|colours|on|off]',
     immediate: true,
   },
 ]
