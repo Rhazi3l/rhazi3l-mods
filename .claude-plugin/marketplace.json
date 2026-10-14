@@ -1,0 +1,6 @@
+{
+  "name": "rhazi3l-mods",
+  "description": "Rhazi3l's Claude Code mods, switched on and off from a Mods row above the prompt.",
+  "owner": { "name": "Rhazi3l" },
+  "plugins": [{ "name": "rhazi3l-mods", "source": "./" }]
+}
