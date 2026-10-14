@@ -1,6 +1,17 @@
 {
   "name": "rhazi3l-mods",
-  "description": "Rhazi3l's Claude Code mods, managed from a corner toolbox, with a themed status line.",
+  "description": "Rhazi3l's Claude Code mods, each installed on its own.",
   "owner": { "name": "Rhazi3l" },
-  "plugins": [{ "name": "rhazi3l-mods", "source": "./" }]
+  "plugins": [
+    {
+      "name": "toolbox",
+      "source": "./mods/toolbox",
+      "description": "A corner toolbox under the prompt for the model, effort and your other mods."
+    },
+    {
+      "name": "clean-view",
+      "source": "./mods/clean-view",
+      "description": "A plain-English checklist of Claude's plan and progress above the prompt, in place of the technical tool rows."
+    }
+  ]
 }

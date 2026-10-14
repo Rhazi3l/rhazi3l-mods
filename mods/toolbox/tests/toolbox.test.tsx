@@ -1,16 +1,16 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
-import type { Engine } from 'claude-code/testing'
+import type { Engine, MockClock } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { modelAlias, prettyModel } from '../hooks/toolbox/text'
+import { modelAlias, prettyModel } from '../hooks/text'
 
 const NOW = Date.parse('2026-10-14T10:00:00Z')
 const SURFACES = ['terminal', 'desktop'] as const
 const RUN = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
 
-const FOOTER = { plugin: 'rhazi3l-mods', component: 'SessionMode', props: { modes: [] } } as const
+const FOOTER = { plugin: 'toolbox', component: 'SessionMode', props: { modes: [] } } as const
 const BAND = {
-  plugin: 'rhazi3l-mods',
+  plugin: 'toolbox',
   component: 'AbovePrompt',
   props: {
     hasSurvey: false,
@@ -22,10 +22,12 @@ const BAND = {
   },
 } as const
 
+let clock: MockClock
+
 /** The engine's own answers beneath the plugin; returns the commands it ran. */
 async function startSession($: Engine, on: On) {
   const ran: string[] = []
-  mock.clock(on, { now: NOW })
+  clock = mock.clock(on, { now: NOW })
   mock.store(on)
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('command.run', { command: 'effort' }, ($, e) => (ran.push(`effort ${e.args}`), { text: 'ok' }))
@@ -35,6 +37,21 @@ async function startSession($: Engine, on: On) {
   })
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
   return ran
+}
+
+/** Stands in for the Clean View mod: its on/off value and its /view command; registered before the session starts. */
+function fakeCleanView(on: On, ran: string[]) {
+  let isOn = true
+  let version = 1
+  on('state.get', ($, e, next) =>
+    e.plugin === 'clean-view' && e.key === 'isOn' ? ({ value: { value: isOn, version } } as never) : next(e),
+  )
+  on('command.run', { command: 'view' }, ($, e) => {
+    ran.push(`view ${e.args}`)
+    isOn = e.args === 'on'
+    version += 1
+    return { text: 'ok' }
+  })
 }
 
 describe('toolbox words', () => {
@@ -58,8 +75,6 @@ describe('toolbox', () => {
       expect(await band.find({ key: 'toolbox-panel' })).toBeDefined()
       expect(await band.find({ key: 'model-opus' })).toBeDefined()
       expect(await band.find({ key: 'effort-high' })).toBeDefined()
-      expect(await band.find({ key: 'mod-clean-view' })).toMatchObject({ text: '● Clean View' })
-      expect(await band.find({ type: 'Text', text: '●' })).toMatchObject({ props: { color: 'success' } })
 
       expect(await band.find({ key: 'toolbox-close' })).toMatchObject({ props: { hotkey: 'x' } })
       await band.press({ key: 'toolbox-close' })
@@ -69,13 +84,64 @@ describe('toolbox', () => {
     }
   })
 
-  test('/toolbox opens it, and its Mods buttons switch a mod off', async ($, on) => {
+  test('rows are laid out by boxes, so the desktop app wraps them rather than overlapping', async ($, on) => {
     await startSession($, on)
     await $.command.run({ command: 'toolbox', args: '', ...RUN })
+    for (const surface of SURFACES) {
+      const band = await $.ui.mount({ ...BAND, surface })
+      const model = await band.find({ key: 'toolbox-model' })
+      expect(model).toBeDefined()
+      expect(JSON.stringify(model)).toContain('"width":8')
+      expect(JSON.stringify(model)).toContain('"flexWrap":"wrap"')
+      expect(await band.find({ type: 'Text', text: /^Model {2,}/ })).toBeUndefined()
+      await band.unmount()
+    }
+  })
+
+  test('with no other mods installed, there is no Mods row and /mods says how to add one', async ($, on) => {
+    await startSession($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
+    for (const surface of SURFACES) {
+      const band = await $.ui.mount({ ...BAND, surface })
+      expect(await band.find({ key: 'toolbox-mods' })).toBeUndefined()
+      await band.unmount()
+    }
+    const listed = await $.command.run({ command: 'mods', args: '', ...RUN })
+    expect(listed.text).toContain('/plugin install clean-view@rhazi3l-mods')
+  })
+
+  test('with Clean View installed, its button runs /view off and on', async ($, on) => {
+    const viewed: string[] = []
+    const toasts: string[] = []
+    fakeCleanView(on, viewed)
+    on('ui.toast', ($, e) => (toasts.push(String(e.text)), { value: undefined }) as never)
+    await startSession($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
+    for (const surface of SURFACES) {
+      const band = await $.ui.mount({ ...BAND, surface })
+      expect(await band.find({ key: 'mod-clean-view' })).toMatchObject({ text: '● Clean View' })
+      await band.unmount()
+    }
+
+    // The real Clean View writes its value, which redraws the panel; the stand-in
+    // can't, so each check mounts the panel afresh.
     const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
     await band.press({ key: 'mod-clean-view' })
-    expect(await band.find({ key: 'mod-clean-view' })).toMatchObject({ text: '○ Clean View' })
     await band.unmount()
+    const after = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await after.find({ key: 'mod-clean-view' })).toMatchObject({ text: '○ Clean View' })
+    await after.press({ key: 'mod-clean-view' })
+    expect(viewed).toEqual(['view off', 'view on'])
+    expect(toasts).toEqual(['Clean View is off.', 'Clean View is on.'])
+    await after.unmount()
+
+    const listed = await $.command.run({ command: 'mods', args: '', ...RUN })
+    expect(listed.text).toContain('● **Clean View**')
+    const turnedOff = await $.command.run({ command: 'mods', args: 'clean view off', ...RUN })
+    expect(turnedOff.text).toBe('Switching Clean View off.')
+    await clock.advance(1)
+    expect(viewed).toEqual(['view off', 'view on', 'view off'])
+    expect(toasts).toContain('Clean View is off.')
   })
 
   test('the footer reads toolbox; the corner panel has no usage; effort runs /effort', async ($, on) => {

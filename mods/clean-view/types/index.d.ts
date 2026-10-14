@@ -50,27 +50,17 @@ export type Checklist = {
   actions: ChecklistAction[]
 }
 
-/** What the toolbox shows: the model and effort the session runs with. */
-export type ToolboxInfo = {
-  model: string
-  /** The effort the last request used, or the saved setting; null before either is known. */
-  effort: string | null
-}
-
 declare module 'claude-code' {
   interface PluginState {
-    'rhazi3l-mods': {
-      /** Which mods of the pack are on, by mod id; a missing id uses the mod's default. */
-      enabledMods: Record<string, boolean>
-      /** Each mod's small settings, keyed `<mod id>:<name>` (Clean View: `clean-view:style`). */
-      modSettings: Record<string, string>
+    'clean-view': {
+      /** Whether Clean View is on. Other mods (the toolbox) read it; only Clean View writes it. */
+      isOn: boolean
+      /** The view the person picked. */
+      style: CleanViewStyle
       checklist: Checklist
       tick: number
       /** True while the Details pane has asked for the engine's own tool rows in the transcript. */
-      cleanViewRaw: boolean
-      /** Whether the toolbox panel above the prompt is open. */
-      toolboxOpen: boolean
-      toolboxInfo: ToolboxInfo
+      showsRaw: boolean
     }
   }
 }

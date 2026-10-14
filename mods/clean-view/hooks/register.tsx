@@ -7,12 +7,10 @@
 // View off) leaves Claude Code as it is.
 
 import { atom, derive, read, update } from 'claude-code'
-import type { On, RenderChildren, Timer } from 'claude-code'
+import type { Register, RenderChildren, Timer } from 'claude-code'
 
-import type { Checklist, ChecklistAction, ChecklistTask, CleanViewStyle, ViewMode } from '../../types'
-import { isModOn } from '../catalog'
-import { STORE_ENABLED, STORE_SETTINGS } from '../pack'
-import { STYLE_SETTING } from './info'
+import type { Checklist, ChecklistAction, ChecklistTask, CleanViewStyle, ViewMode } from '../types'
+import { COMMANDS, TOOLS } from './info'
 import {
   apiErrorSentence,
   cleanName,
@@ -25,12 +23,16 @@ import {
   trimToWidth,
 } from './text'
 
-const OWN_PREFIX = 'mcp__rhazi3l-mods__'
-const PLAN_TOOL = 'mcp__rhazi3l-mods__plan_steps'
-const PROGRESS_TOOL = 'mcp__rhazi3l-mods__report_progress'
+const OWN_PREFIX = 'mcp__clean-view__'
+const PLAN_TOOL = 'mcp__clean-view__plan_steps'
+const PROGRESS_TOOL = 'mcp__clean-view__report_progress'
 
 const ALWAYS_ALLOWED = new Set(['ToolSearch', 'TodoWrite', 'TaskCreate', 'TaskUpdate', 'AskUserQuestion'])
 const METER = 10
+/** The overall bar's cells where the surface does not draw in even cells (the desktop app). */
+const OVERALL_FIXED = 20
+/** Room for a step's label after its bar: two cells of gap, then `Working` or `Up next`. */
+const LABEL_CELLS = 9
 const TICK_MS = 250
 const COLLAPSE_MS = 5000
 const MAX_ACTIONS = 300
@@ -59,22 +61,18 @@ const EMPTY: Checklist = {
   actions: [],
 }
 
-// The pack's shared values (types/index.d.ts): which mods are on, and their settings.
-const enabledModsAtom = atom({ plugin: 'rhazi3l-mods', key: 'enabledMods' } as const, {})
-const modSettingsAtom = atom({ plugin: 'rhazi3l-mods', key: 'modSettings' } as const, {})
-const checklistAtom = atom({ plugin: 'rhazi3l-mods', key: 'checklist' } as const, EMPTY)
-const tickAtom = atom({ plugin: 'rhazi3l-mods', key: 'tick' } as const, 0)
-const rawAtom = atom({ plugin: 'rhazi3l-mods', key: 'cleanViewRaw' } as const, false)
-
-/** The style the person picked (Guided unless they chose Simple). */
-const styleAtom = derive([modSettingsAtom], (settings): CleanViewStyle =>
-  settings[STYLE_SETTING] === 'simple' ? 'simple' : 'guided',
-)
+// Values the drawings read (types/index.d.ts). `isOn` and `style` are saved in
+// $.store too, so they last past the session; the toolbox reads `isOn`.
+const STORE_ON = 'isOn'
+const STORE_STYLE = 'style'
+const isOnAtom = atom({ plugin: 'clean-view', key: 'isOn' } as const, true)
+const styleAtom = atom({ plugin: 'clean-view', key: 'style' } as const, 'guided')
+const checklistAtom = atom({ plugin: 'clean-view', key: 'checklist' } as const, EMPTY)
+const tickAtom = atom({ plugin: 'clean-view', key: 'tick' } as const, 0)
+const rawAtom = atom({ plugin: 'clean-view', key: 'showsRaw' } as const, false)
 
 /** The view in force: the picked style, or `full` while Clean View is off. */
-const modeAtom = derive([styleAtom, enabledModsAtom], (style, mods): ViewMode =>
-  isModOn(mods, 'clean-view') ? style : 'full',
-)
+const modeAtom = derive([styleAtom, isOnAtom], (style, isOn): ViewMode => (isOn ? style : 'full'))
 
 /** Whether the transcript shows the engine's own tool rows: Clean View off, or Details asked for them. */
 const showsToolRowsAtom = derive([modeAtom, rawAtom], (mode, raw) => mode === 'full' || raw)
@@ -247,11 +245,6 @@ function overallPercent(tasks: readonly ChecklistTask[]): number {
   return Math.round(((done + partial) / tasks.length) * 100)
 }
 
-function pad(text: string, width: number): string {
-  const cut = trimToWidth(text, width)
-  return cut + ' '.repeat(Math.max(0, width - cut.length))
-}
-
 /** A step's bar as lit and unlit cells (`━`, as the overall bar): full, empty, a share, or a moving run while no share is known. */
 export function meterCells(task: ChecklistTask, tick: number): boolean[] {
   if (task.status === 'done') return Array.from({ length: METER }, () => true)
@@ -277,7 +270,22 @@ function meterRuns(cells: boolean[]): { lit: boolean; text: string }[] {
 
 // ---------- Hooks ----------
 
-export function registerCleanView(on: On) {
+export const register: Register = on => {
+  on('session.start', async ($, e, next) => {
+    const savedOn = await $.store.get(STORE_ON)
+    const savedStyle = await $.store.get(STORE_STYLE)
+    // Written even when unchanged, so other mods can tell Clean View is installed.
+    await update($, isOnAtom, () => (typeof savedOn === 'boolean' ? savedOn : true))
+    await update($, styleAtom, (): CleanViewStyle => (savedStyle === 'simple' ? 'simple' : 'guided'))
+    try {
+      for (const tool of TOOLS) await $.tool.register(tool)
+      for (const command of COMMANDS) await $.command.register(command)
+    } catch {
+      // Not bound (a headless host): Clean View still follows what it can.
+    }
+    return next(e)
+  })
+
   on('command.run', { command: 'view' }, async ($, e) => {
     const arg = e.args.trim().toLowerCase()
     if (arg === 'details') {
@@ -290,8 +298,8 @@ export function registerCleanView(on: On) {
     }
     if (arg === 'on' || arg === 'off' || arg === 'full') {
       const isOn = arg === 'on'
-      const written = await update($, enabledModsAtom, map => ({ ...map, 'clean-view': isOn }))
-      await $.store.set(STORE_ENABLED, written)
+      await update($, isOnAtom, () => isOn)
+      await $.store.set(STORE_ON, isOn)
       return { text: isOn ? 'Clean View is on.' : 'Clean View is off. Everything Claude does is shown in full.' }
     }
     if (arg !== '' && arg !== 'simple' && arg !== 'guided') {
@@ -300,8 +308,8 @@ export function registerCleanView(on: On) {
       }
     }
     const style = arg === '' ? nextStyle(await read($, styleAtom)) : (arg as CleanViewStyle)
-    const written = await update($, modSettingsAtom, map => ({ ...map, [STYLE_SETTING]: style }))
-    await $.store.set(STORE_SETTINGS, written)
+    await update($, styleAtom, () => style)
+    await $.store.set(STORE_STYLE, style)
     return { text: styleToast(style) }
   })
 
@@ -314,7 +322,7 @@ export function registerCleanView(on: On) {
     const composed = await next(e)
     if ((await read($, modeAtom)) === 'full') return composed
     return {
-      sections: [...composed.sections, { id: 'rhazi3l-mods:clean-view', text: PROMPT_SECTION, scope: 'session' as const }],
+      sections: [...composed.sections, { id: 'clean-view', text: PROMPT_SECTION, scope: 'session' as const }],
     }
   })
 
@@ -371,7 +379,7 @@ export function registerCleanView(on: On) {
   })
 
   // The model's two checklist tools.
-  on('tool.call', { tool: 'mcp__rhazi3l-mods__plan_steps' }, async ($, e) => {
+  on('tool.call', { tool: 'mcp__clean-view__plan_steps' }, async ($, e) => {
     const raw = (e as unknown as { steps?: unknown }).steps
     const steps = Array.isArray(raw) ? raw.map(s => String(s)).filter(s => s.trim() !== '') : []
     if (steps.length === 0) return { deny: 'plan_steps needs at least one step name.' }
@@ -380,7 +388,7 @@ export function registerCleanView(on: On) {
     return { result: `Planned ${written.tasks.length} steps. The first one has started.` }
   })
 
-  on('tool.call', { tool: 'mcp__rhazi3l-mods__report_progress' }, async ($, e) => {
+  on('tool.call', { tool: 'mcp__clean-view__report_progress' }, async ($, e) => {
     const args = e as unknown as { task?: unknown; percent?: unknown }
     const percent = clampPercent(args.percent)
     if (e.agentId === undefined) {
@@ -549,9 +557,14 @@ export function registerCleanView(on: On) {
     const style = await read($, styleAtom)
     // Inside the frame: its border and padding take four columns.
     const width = Math.max(20, e.props.bodyColumns - 4)
+    // The terminal draws in even character cells, so bars and columns can be
+    // sized to its width. The desktop app draws its own font and native
+    // buttons, wider than the cells it reports, so there the boxes do the
+    // aligning, bars keep a fixed size and the buttons wrap.
+    const isTerminal = e.surface === 'terminal'
 
     const buttons = (
-      <Box key="clean-view-buttons" flexDirection="row">
+      <Box key="clean-view-buttons" flexDirection="row" flexShrink={0}>
         <Button
           key="clean-view-details"
           label="Details"
@@ -563,8 +576,8 @@ export function registerCleanView(on: On) {
           label={styleLabel(style)}
           onPress={async () => {
             const chosen = nextStyle(await read($, styleAtom))
-            const written = await update($, modSettingsAtom, map => ({ ...map, [STYLE_SETTING]: chosen }))
-            await $.store.set(STORE_SETTINGS, written)
+            await update($, styleAtom, () => chosen)
+            await $.store.set(STORE_STYLE, chosen)
             $.ui.toast(styleToast(chosen))
           }}
         />
@@ -603,12 +616,14 @@ export function registerCleanView(on: On) {
 
     const showsTime = c.phase === 'working' || c.phase === 'needsYou' || c.phase === 'done'
     const headerRow = (
-      <Box key="clean-view-header" flexDirection="row" justifyContent="space-between">
+      <Box key="clean-view-header" flexDirection="row" justifyContent="space-between" flexWrap={isTerminal ? 'nowrap' : 'wrap'}>
         <Box flexGrow={1} flexShrink={1}>
           {header}
         </Box>
-        {showsTime && <Text dimColor>{`${c.phase === 'done' ? `took ${elapsed}` : elapsed}  `}</Text>}
-        {buttons}
+        <Box flexDirection="row" flexShrink={0}>
+          {showsTime && <Text dimColor>{`${c.phase === 'done' ? `took ${elapsed}` : elapsed}  `}</Text>}
+          {buttons}
+        </Box>
       </Box>
     )
     // The frame keeps the checklist apart from the reply; its colour says how the job stands.
@@ -632,7 +647,7 @@ export function registerCleanView(on: On) {
     const doneCount = c.tasks.filter(t => t.status === 'done').length
     const overall = overallPercent(c.tasks)
     const stepText = `Step ${Math.max(1, Math.min(total, doneCount + 1))} of ${total}`
-    const overallCells = Math.max(4, width - stepText.length - 7)
+    const overallCells = isTerminal ? Math.max(4, width - stepText.length - 7) : OVERALL_FIXED
     const overallFilled = Math.round((overall / 100) * overallCells)
     const overallRow =
       total > 0 && c.phase !== 'done' ? (
@@ -667,17 +682,21 @@ export function registerCleanView(on: On) {
           <Text color={task.status === 'done' ? 'success' : isActive ? 'claude' : undefined} dimColor={task.status === 'upcoming'}>
             {`${icon} `}
           </Text>
-          <Text bold={isActive} dimColor={!isActive}>
-            {pad(task.name, nameWidth)}
-          </Text>
-          <Text>{' '}</Text>
-          {meterRuns(meterCells(task, tick)).map((run, r) => (
-            <Text key={`meter-${task.id}-${r}`} color={!run.lit ? 'subtle' : task.status === 'done' ? 'success' : 'claude'}>
-              {run.text}
+          <Box key="name" {...(isTerminal ? { width: nameWidth + 1, flexShrink: 0 } : { flexGrow: 1, flexShrink: 1 })}>
+            <Text bold={isActive} dimColor={!isActive} wrap="truncate-end">
+              {trimToWidth(task.name, nameWidth)}
             </Text>
-          ))}
-          <Text>{'  '}</Text>
-          <Text dimColor={!isActive}>{label}</Text>
+          </Box>
+          <Box key="meter" flexDirection="row" flexShrink={0}>
+            {meterRuns(meterCells(task, tick)).map((run, r) => (
+              <Text key={`meter-${task.id}-${r}`} color={!run.lit ? 'subtle' : task.status === 'done' ? 'success' : 'claude'}>
+                {run.text}
+              </Text>
+            ))}
+          </Box>
+          <Box key="label" width={LABEL_CELLS} flexShrink={0} paddingLeft={2}>
+            <Text dimColor={!isActive}>{label}</Text>
+          </Box>
         </Box>
       )
       if (!isActive || !showsTrail || !latest) return [row]
@@ -778,7 +797,7 @@ export function registerCleanView(on: On) {
 
     return (
       <Box flexDirection="column">
-        <Box flexDirection="row" justifyContent="space-between">
+        <Box flexDirection="row" justifyContent="space-between" flexWrap={e.surface === 'terminal' ? 'nowrap' : 'wrap'}>
           <Box flexDirection="row" flexShrink={1}>
             <Text bold color="claude" wrap="truncate-end">
               {c.title}

@@ -2,17 +2,17 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { meterCells } from '../hooks/clean-view/clean-view'
-import { cleanName, describeAction } from '../hooks/clean-view/text'
+import { meterCells } from '../hooks/register'
+import { cleanName, describeAction } from '../hooks/text'
 
-const PREFIX = 'mcp__rhazi3l-mods__'
-const PLAN = 'mcp__rhazi3l-mods__plan_steps'
-const PROGRESS = 'mcp__rhazi3l-mods__report_progress'
+const PREFIX = 'mcp__clean-view__'
+const PLAN = 'mcp__clean-view__plan_steps'
+const PROGRESS = 'mcp__clean-view__report_progress'
 const SURFACES = ['terminal', 'desktop'] as const
 const RUN = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
 
 const BAND = {
-  plugin: 'rhazi3l-mods',
+  plugin: 'clean-view',
   component: 'AbovePrompt',
   props: {
     hasSurvey: false,
@@ -25,7 +25,7 @@ const BAND = {
 } as const
 
 const ROW = {
-  plugin: 'rhazi3l-mods',
+  plugin: 'clean-view',
   component: 'ToolUse',
   props: {
     tool_use_id: 'tu1',
@@ -38,7 +38,7 @@ const ROW = {
 } as const
 
 const PANE = {
-  plugin: 'rhazi3l-mods',
+  plugin: 'clean-view',
   component: 'Pane',
   requestId: 'clean-view-details',
   props: {
@@ -254,44 +254,40 @@ describe('checklist', () => {
   })
 })
 
-describe('mods in the toolbox', () => {
-  test('the toolbox shows while idle, and its button turns Clean View off and on', async ($, on) => {
-    await startSession($, on)
-    await $.command.run({ command: 'toolbox', args: '', ...RUN })
-    for (const surface of SURFACES) {
-      const ui = await $.ui.mount({ ...BAND, surface })
-      expect(await ui.find({ key: 'mod-clean-view' })).toMatchObject({ text: '● Clean View' })
-      await ui.unmount()
-    }
-
-    await $.prompt.submit({ text: 'Build my landing page', wait: false, origin: RUN.origin })
-    await $.turn.start({ text: 'Build my landing page', turnId: 't1' })
+describe('on and off', () => {
+  test('/view off hides the checklist and frees the tools; /view on brings it back', async ($, on) => {
+    await startJob($, on)
+    await $.command.run({ command: 'view', args: 'off', ...RUN })
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await ui.find({ type: 'Text', text: /Understand your request/ })).toBeDefined()
-
-    await ui.press({ key: 'mod-clean-view' })
-    expect(await ui.find({ key: 'mod-clean-view' })).toMatchObject({ text: '○ Clean View' })
     expect(await ui.find({ type: 'Text', text: /Understand your request/ })).toBeUndefined()
     const free = await $.tool.call({ tool: 'Read', file_path: '/tmp/a.md' })
     expect(free.deny).toBeUndefined()
 
-    await ui.press({ key: 'mod-clean-view' })
+    await $.command.run({ command: 'view', args: 'on', ...RUN })
     expect(await ui.find({ type: 'Text', text: /Understand your request/ })).toBeDefined()
     await ui.unmount()
   })
+})
 
-  test('/view off hides the checklist and /mods lists the mods', async ($, on) => {
+describe('layout on each surface', () => {
+  test('the terminal sizes columns and the bar to its width; the desktop lets boxes align and buttons wrap', async ($, on) => {
     await startJob($, on)
-    await $.command.run({ command: 'toolbox', args: '', ...RUN })
-    await $.command.run({ command: 'view', args: 'off', ...RUN })
-    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await ui.find({ type: 'Text', text: /Understand your request/ })).toBeUndefined()
-    expect(await ui.find({ key: 'mod-clean-view' })).toMatchObject({ text: '○ Clean View' })
-    await ui.unmount()
+    await $.tool.call({ tool: PLAN, steps: ['Read your notes', 'Build the page'] } as never)
 
-    const listed = await $.command.run({ command: 'mods', args: '', ...RUN })
-    expect(JSON.stringify(listed)).toContain('Clean View')
-    const turnedOn = await $.command.run({ command: 'mods', args: 'clean view on', ...RUN })
-    expect(JSON.stringify(turnedOn)).toContain('Clean View is on')
+    const term = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await term.find({ key: 'clean-view-header' })).toMatchObject({ props: { flexWrap: 'nowrap' } })
+    expect(await term.find({ key: 'name' })).toMatchObject({ props: { width: expect.any(Number) } })
+    const termBar = await term.find({ key: 'clean-view-overall' })
+    expect((termBar?.text.match(/━/g) ?? []).length).toBeGreaterThan(40)
+    await term.unmount()
+
+    const desk = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    expect(await desk.find({ key: 'clean-view-header' })).toMatchObject({ props: { flexWrap: 'wrap' } })
+    expect(await desk.find({ key: 'clean-view-buttons' })).toMatchObject({ props: { flexShrink: 0 } })
+    expect(await desk.find({ key: 'name' })).toMatchObject({ props: { flexGrow: 1, flexShrink: 1 } })
+    const deskBar = await desk.find({ key: 'clean-view-overall' })
+    expect((deskBar?.text.match(/━/g) ?? []).length).toBe(20)
+    expect(await desk.find({ type: 'Text', text: /^Read your notes +$/ })).toBeUndefined()
+    await desk.unmount()
   })
 })

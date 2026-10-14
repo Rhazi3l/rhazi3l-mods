@@ -1,7 +1,0 @@
-{
-  "name": "rhazi3l-mods",
-  "version": "0.3.0",
-  "description": "Personal Claude Code mods managed from a corner toolbox (model, effort, mods), plus a themed status line. Includes Clean View.",
-  "author": { "name": "Rhazi3l" },
-  "types": "./types/index.d.ts"
-}
