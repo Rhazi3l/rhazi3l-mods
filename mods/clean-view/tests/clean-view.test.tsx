@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { asksSomething, meterCells } from '../hooks/register'
+import { asksSomething, meterCells, shadeOf, WAIT_COLOURS } from '../hooks/register'
 import { cleanName, describeAction, extractQuestion, quickReplies } from '../hooks/text'
 
 const PREFIX = 'mcp__clean-view__'
@@ -294,7 +294,7 @@ describe('replying to a question', () => {
       expect(await ui.find({ key: 'clean-view-question' })).toMatchObject({ text: expect.stringContaining('Which do you want?') })
       expect(await ui.find({ key: 'clean-view-reply-0' })).toMatchObject({ text: 'Option 1', props: { variant: 'primary' } })
       expect(await ui.find({ key: 'clean-view-reply-2' })).toMatchObject({ text: 'Option 3' })
-      expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: 'permission' } })
+      expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: shadeOf('permission') } })
       expect(await ui.find({ key: 'clean-view-replies' })).toMatchObject({ props: { flexWrap: 'wrap' } })
       await ui.unmount()
     }
@@ -343,8 +343,10 @@ describe('the waiting colour', () => {
     expect((await $.command.run({ command: 'view', args: 'colours', ...RUN })).text).toContain('Colour samples open')
     for (const surface of SURFACES) {
       const pane = await $.ui.mount({ ...SWATCHES, surface })
-      for (const [name, key] of [['blue', 'permission'], ['cyan', 'suggestion'], ['amber', 'warning'], ['red', 'error'], ['green', 'success'], ['orange', 'claude']]) {
-        expect(await pane.find({ key: `colour-${name}` })).toMatchObject({ props: { borderStyle: 'bold', borderColor: key } })
+      expect(WAIT_COLOURS).toHaveLength(6)
+      for (const { name, shade } of WAIT_COLOURS) {
+        expect(shade).toMatch(/^#[0-9a-f]{6}$/)
+        expect(await pane.find({ key: `colour-${name}` })).toMatchObject({ props: { borderStyle: 'bold', borderColor: shade } })
         expect(await pane.find({ key: `colour-use-${name}` })).toBeDefined()
       }
       expect(await pane.find({ key: 'colour-use-blue' })).toMatchObject({ text: 'blue (in use)' })
@@ -356,20 +358,20 @@ describe('the waiting colour', () => {
     await startJob($, on)
     await $.turn.complete({ turnId: 't1', answer: 'Which one do you want?', reason: 'answer' } as never)
     const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await band.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: 'permission' } })
+    expect(await band.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: shadeOf('permission') } })
 
     const pane = await $.ui.mount({ ...SWATCHES, surface: 'terminal' })
     await pane.press({ key: 'colour-use-cyan' })
     await pane.unmount()
     const cyan = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await cyan.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: 'suggestion' } })
-    expect(await cyan.find({ type: 'Text', text: /^ Needs you $/ })).toMatchObject({ props: { backgroundColor: 'suggestion' } })
+    expect(await cyan.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: shadeOf('suggestion') } })
+    expect(await cyan.find({ type: 'Text', text: /^ Needs you $/ })).toMatchObject({ props: { backgroundColor: shadeOf('suggestion') } })
     await cyan.unmount()
 
     expect((await $.command.run({ command: 'view', args: 'colour red', ...RUN })).text).toBe('The waiting frame is now red.')
     expect((await $.command.run({ command: 'view', args: 'colour pink', ...RUN })).text).toContain('Pick one of')
     const red = await $.ui.mount({ ...BAND, surface: 'desktop' })
-    expect(await red.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: 'error' } })
+    expect(await red.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: shadeOf('error') } })
     await red.unmount()
     await band.unmount()
   })

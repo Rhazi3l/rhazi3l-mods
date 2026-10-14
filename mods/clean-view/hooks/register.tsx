@@ -72,16 +72,22 @@ const STORE_ON = 'isOn'
 const STORE_STYLE = 'style'
 const STORE_WAIT_COLOUR = 'waitColour'
 const COLOURS_PANE = 'clean-view-colours'
-/** The theme colours offered for the frame while Claude waits for a reply, by the name the person uses. */
-const WAIT_COLOURS = [
-  { name: 'blue', key: 'permission', note: "the blue of Claude Code's own questions" },
-  { name: 'cyan', key: 'suggestion', note: 'brighter, close to blue' },
-  { name: 'amber', key: 'warning', note: 'the yellow of a stuck job' },
-  { name: 'red', key: 'error', note: 'loudest; reads as an error' },
-  { name: 'green', key: 'success', note: 'the green of a finished job' },
-  { name: 'orange', key: 'claude', note: 'the same as a job in progress' },
+/**
+ * The colours offered for the frame while Claude waits for a reply, by the name the person
+ * uses. `key` is the theme colour each began as and is what is saved; `shade` is the soft
+ * pastel drawn (the theme colour lifted toward white), easier on the eyes than the theme's own.
+ */
+export const WAIT_COLOURS = [
+  { name: 'blue', key: 'permission', shade: '#a8bdd2', note: "soft blue, close to Claude Code's own questions" },
+  { name: 'cyan', key: 'suggestion', shade: '#add2dd', note: 'soft cyan, a little brighter than blue' },
+  { name: 'amber', key: 'warning', shade: '#efdaaf', note: 'soft yellow, near the stuck-job amber' },
+  { name: 'red', key: 'error', shade: '#e39da3', note: 'soft red, the loudest; reads as an error' },
+  { name: 'green', key: 'success', shade: '#bfd1af', note: 'soft green, near the finished-job green' },
+  { name: 'orange', key: 'claude', shade: '#de9e79', note: 'soft orange, near a job in progress' },
 ] as const
 const DEFAULT_WAIT_COLOUR = 'permission'
+/** The pastel drawn for a saved colour key. */
+export const shadeOf = (key: string): string => WAIT_COLOURS.find(colour => colour.key === key)?.shade ?? WAIT_COLOURS[0].shade
 const isWaitColour = (key: unknown): key is string => WAIT_COLOURS.some(colour => colour.key === key)
 const isOnAtom = atom({ plugin: 'clean-view', key: 'isOn' } as const, true)
 const styleAtom = atom({ plugin: 'clean-view', key: 'style' } as const, 'guided')
@@ -599,7 +605,7 @@ export const register: Register = on => {
     const below = await next(e)
 
     const { Box, Text, Button } = $.ui.resolve(e)
-    const waitColour = await read($, waitColourAtom)
+    const waitColour = shadeOf(await read($, waitColourAtom))
     const tick = await read($, tickAtom)
     const now = await $.clock.now()
     const style = await read($, styleAtom)
@@ -814,13 +820,13 @@ export const register: Register = on => {
             key={`colour-${colour.name}`}
             flexDirection="column"
             borderStyle="bold"
-            borderColor={colour.key}
+            borderColor={colour.shade}
             paddingX={1}
           >
             <Box flexDirection="row" flexWrap="wrap" justifyContent="space-between">
               <Box flexShrink={1}>
                 <Text wrap="wrap">
-                  <Text backgroundColor={colour.key} color="inverseText" bold>
+                  <Text backgroundColor={colour.shade} color="inverseText" bold>
                     {' Needs you '}
                   </Text>
                   {' Claude is waiting for your reply'}
