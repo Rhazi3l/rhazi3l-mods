@@ -1,21 +1,23 @@
-// The pastel colours every rhazi3l mod draws with, so their frames, bars and
-// labels match. Each mod keeps its own copy (a plugin cannot import another's
-// files): when you change one, change the same file in the other mods.
+// The colours every rhazi3l mod draws with, so their frames, bars and labels
+// match. Each mod keeps its own copy (a plugin cannot import another's files):
+// when you change one, change the same file in the other mods.
 //
-// They are fixed hex values, softer than the theme's colours, so they do not
-// follow the theme. Unlit bars and dim text still use the theme.
+// Orange is the theme's own accent. The rest sit halfway between the theme's
+// colour and a pastel of it: softer than the theme, but still easy to tell apart.
+// They are fixed hex values, so they do not follow the theme. Unlit bars and dim
+// text still use the theme.
 
 export const PASTEL = {
-  /** In progress, and the accent: titles, lit bars, the star. A soft orange. */
-  working: '#de9e79',
-  /** Waiting for the person's reply. A soft blue. */
-  waiting: '#a8bdd2',
-  /** Stuck, or a warning. A soft yellow. */
-  stuck: '#efdaaf',
-  /** Done, and on in a switch. A soft green. */
-  done: '#bfd1af',
-  /** Stopped, off, and the original beside an upgrade. A soft grey. */
-  stopped: '#a9aeb7',
-  /** Something went wrong. A soft red. */
-  error: '#e39da3',
+  /** In progress, and the accent: titles, lit bars, the star. The theme's orange. */
+  working: '#d4743c',
+  /** Waiting for the person's reply. A medium-soft blue. */
+  waiting: '#94afca',
+  /** Stuck, or a warning. A medium-soft yellow. */
+  stuck: '#edd29d',
+  /** Done, and on in a switch. A medium-soft green. */
+  done: '#b1c89e',
+  /** Stopped, off, and the original beside an upgrade. A medium-soft grey. */
+  stopped: '#8f949d',
+  /** Something went wrong. A medium-soft red. */
+  error: '#de868e',
 } as const
