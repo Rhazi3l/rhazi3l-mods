@@ -3,7 +3,7 @@ import type { Engine, MockClock } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { PASTEL } from '../hooks/palette'
-import { buildRequest, countWords, parseUpgrade } from '../hooks/text'
+import { buildRequest, countWords, fillPlaceholders, findPlaceholders, parseUpgrade } from '../hooks/text'
 
 const SURFACES = ['terminal', 'desktop'] as const
 const RUN = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
@@ -86,6 +86,19 @@ describe('reading the answer', () => {
   })
 })
 
+describe('placeholders', () => {
+  test('placeholders are found once each, in order, without the brackets', async () => {
+    expect(findPlaceholders('Hours: [opening hours]. Name: [bakery name]. Again: [opening hours].')).toEqual(['opening hours', 'bakery name'])
+    expect(findPlaceholders('No blanks here, just [x] and [ ] and a [link](https://a.b).')).toEqual([])
+  })
+
+  test('filled blanks are replaced everywhere, empty ones stay as they were', async () => {
+    const text = 'Hours: [opening hours]. Name: [bakery name]. Hours again: [opening hours].'
+    expect(fillPlaceholders(text, { 'opening hours': '07:00 to 17:00' })).toBe('Hours: 07:00 to 17:00. Name: [bakery name]. Hours again: 07:00 to 17:00.')
+    expect(fillPlaceholders(text, { 'bakery name': '   ' })).toBe(text)
+  })
+})
+
 describe('the /better flow', () => {
   test('/better answers at once, then the pane shows the prompt beside the upgrade on both surfaces', async ($, on) => {
     const seen = await startSession($, on)
@@ -134,14 +147,37 @@ describe('the /better flow', () => {
     await pane.unmount()
   })
 
-  test('Edit changes the upgrade, and Run it sends the edited text', async ($, on) => {
+  test('each [placeholder] gets a field; typing fills the upgrade live, and Run it sends the filled text', async ($, on) => {
+    const seen = await startSession($, on)
+    await better($, ROUGH)
+    for (const surface of SURFACES) {
+      const pane = await $.ui.mount({ ...PANE, surface })
+      expect(await pane.find({ key: 'pu-fill-0' })).toBeDefined()
+      expect(await pane.find({ key: 'pu-fill-1' })).toBeUndefined()
+      expect(await pane.find({ type: 'Text', text: /0 of 1 blank filled/ })).toBeDefined()
+      await pane.unmount()
+    }
+    const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    await pane.input({ key: 'pu-fill-0', text: '07:00 to 17:00', kind: 'change' })
+    expect(await pane.find({ key: 'pu-upgraded' })).toMatchObject({ text: expect.stringContaining('Opening hours: 07:00 to 17:00.') })
+    expect(await pane.find({ type: 'Text', text: /1 of 1 blank filled/ })).toBeDefined()
+    await pane.press({ key: 'pu-run' })
+    expect(seen.submitted).toHaveLength(1)
+    expect(seen.submitted[0]).toContain('Opening hours: 07:00 to 17:00.')
+    expect(seen.submitted[0]).not.toContain('[opening hours]')
+    await pane.unmount()
+  })
+
+  test('Edit in prompt box puts the filled text in the main prompt box and closes the pane, sending nothing', async ($, on) => {
     const seen = await startSession($, on)
     await better($, ROUGH)
     const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    await pane.input({ key: 'pu-fill-0', text: '08:00 to 16:00', kind: 'change' })
     await pane.press({ key: 'pu-edit' })
-    await pane.input({ key: 'pu-edit-field', text: 'Build a bakery page. Hours: 07:00 to 17:00.', kind: 'change' })
-    await pane.input({ key: 'pu-edit-field', text: 'Build a bakery page. Hours: 07:00 to 17:00.', kind: 'submit' })
-    expect(seen.submitted).toEqual(['Build a bakery page. Hours: 07:00 to 17:00.'])
+    expect(seen.filled).toHaveLength(1)
+    expect(seen.filled[0]).toContain('Opening hours: 08:00 to 16:00.')
+    expect(seen.closed).toEqual(['prompt-upgrade'])
+    expect(seen.submitted).toEqual([])
     await pane.unmount()
   })
 

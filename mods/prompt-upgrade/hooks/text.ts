@@ -48,3 +48,21 @@ export function parseUpgrade(reply: string): Upgrade | null {
 export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length
 }
+
+/** The `[placeholders]` in a text, without the brackets, each once, in the order they first appear. A `[link](address)` is not one. */
+export function findPlaceholders(text: string): string[] {
+  const found: string[] = []
+  for (const match of text.matchAll(/\[([^[\]\n]{2,80})\](?!\()/g)) {
+    const name = (match[1] ?? '').trim()
+    if (name !== '' && !found.includes(name)) found.push(name)
+  }
+  return found
+}
+
+/** The text with each `[placeholder]` the person has filled in replaced by their words; the rest stay as they were. */
+export function fillPlaceholders(text: string, fills: Readonly<Record<string, string>>): string {
+  return text.replace(/\[([^[\]\n]{2,80})\](?!\()/g, (whole, inner: string) => {
+    const typed = (fills[inner.trim()] ?? '').trim()
+    return typed === '' ? whole : typed
+  })
+}

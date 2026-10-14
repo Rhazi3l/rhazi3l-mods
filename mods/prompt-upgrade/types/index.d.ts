@@ -9,8 +9,8 @@ export type UpgradeFlow = {
   upgraded: string
   /** Short phrases saying what the rewrite added. */
   added: string[]
-  /** True while the upgrade is open for editing. */
-  isEditing: boolean
+  /** What the person typed for each `[placeholder]` of the rewrite, by the placeholder's words. */
+  fills: Record<string, string>
   /** A plain sentence for the error card. */
   note: string
   /** Increases with every upgrade, so a late model answer for an old one is ignored. */

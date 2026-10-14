@@ -10,14 +10,14 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { UpgradeFlow } from '../types'
 import { PASTEL } from './palette'
-import { buildRequest, countWords, parseUpgrade } from './text'
+import { buildRequest, countWords, fillPlaceholders, findPlaceholders, parseUpgrade } from './text'
 
 const PANE = 'prompt-upgrade'
 const TITLE = 'Prompt Upgrade'
 const STORE_ON = 'isOn'
 const NARROW = 70
 
-const IDLE: UpgradeFlow = { phase: 'idle', original: '', upgraded: '', added: [], isEditing: false, note: '', runId: 0 }
+const IDLE: UpgradeFlow = { phase: 'idle', original: '', upgraded: '', added: [], fills: {}, note: '', runId: 0 }
 
 // Whether the footer button shows. The toolbox switches it; `/better <prompt>` works either way.
 const isOnAtom = atom({ plugin: 'prompt-upgrade', key: 'isOn' } as const, true)
@@ -46,7 +46,7 @@ async function upgrade($: EngineInterface, original: string) {
     const parsed = parseUpgrade(reply.text)
     if (!parsed) return fail($, runId, 'The answer was not in a form I could read.')
     await update($, flowAtom, (flow): UpgradeFlow =>
-      flow.runId === runId ? { ...flow, phase: 'review', upgraded: parsed.upgraded, added: parsed.added, isEditing: false } : flow,
+      flow.runId === runId ? { ...flow, phase: 'review', upgraded: parsed.upgraded, added: parsed.added, fills: {} } : flow,
     )
   } catch {
     await fail($, runId, 'Something went wrong while upgrading.')
@@ -76,6 +76,17 @@ async function send($: EngineInterface, text: string) {
     void $.prompt.submit({ text: sent, asUser: true })
   } catch {
     $.ui.toast("Couldn't send the prompt.")
+  }
+}
+
+/** Puts `text` in the main prompt box, which is roomier than a field in the pane, and closes the pane. */
+async function editInBox($: EngineInterface, text: string) {
+  try {
+    const filled = await $.prompt.fill({ text })
+    if (!filled.isFilled) return $.ui.toast("Couldn't put it in the prompt box.")
+    await finish($)
+  } catch {
+    $.ui.toast("Couldn't put it in the prompt box.")
   }
 }
 
@@ -149,7 +160,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const ui = $.ui.resolve(e)
     const { Box, Text, Button } = ui
-    // The mobile app draws no text field yet, so there the upgrade cannot be edited.
+    // The mobile app draws no text field yet, so there the blanks cannot be filled in the pane.
     const Input = 'Input' in ui ? ui.Input : undefined
     const flow = await read($, flowAtom)
     const isNarrow = (e.props.bodyColumns ?? 80) < NARROW
@@ -219,54 +230,28 @@ export const register: Register = on => {
       )
     }
 
+    // The rewrite with the blanks the person has filled in; what Run it sends, Copy copies and the card shows.
+    const text = fillPlaceholders(flow.upgraded, flow.fills)
+    const blanks = findPlaceholders(flow.upgraded)
+    const filledCount = blanks.filter(name => (flow.fills[name] ?? '').trim() !== '').length
     const before = countWords(flow.original)
-    const after = countWords(flow.upgraded)
-
-    if (flow.isEditing && Input) {
-      return (
-        <Box flexDirection="column" gap={1}>
-          {heading('Edit the upgrade')}
-          <Input
-            key="pu-edit-field"
-            autoFocus
-            value={flow.upgraded}
-            submitLabel="send"
-            onInput={value => void update($, flowAtom, now => ({ ...now, upgraded: value }))}
-            onSubmit={value => void send($, value)}
-          />
-          <Box flexDirection="row" flexWrap="wrap" gap={1}>
-            <Button key="pu-run" label="Run it" variant="primary" hotkey="r" onPress={() => send($, flow.upgraded)} />
-            <Button
-              key="pu-back"
-              label="Back"
-              onPress={() => void update($, flowAtom, now => ({ ...now, isEditing: false }))}
-            />
-            {cancel}
-          </Box>
-        </Box>
-      )
-    }
+    const after = countWords(text)
+    const details = `${flow.added.length} detail${flow.added.length === 1 ? '' : 's'} added`
+    const left = blanks.length === 0 ? '' : ` · ${filledCount} of ${blanks.length} blank${blanks.length === 1 ? '' : 's'} filled`
 
     return (
       <Box flexDirection="column" gap={1}>
-        <Text key="pu-numbers" dimColor>{`${before} words → ${after} words · ${flow.added.length} detail${flow.added.length === 1 ? '' : 's'} added`}</Text>
+        <Text key="pu-numbers" dimColor>{`${before} words → ${after} words · ${details}${left}`}</Text>
         <Box flexDirection="row" flexWrap="wrap" gap={1}>
-          <Button key="pu-run" label="Run it" variant="primary" hotkey="r" onPress={() => send($, flow.upgraded)} />
-          {Input && (
-            <Button
-              key="pu-edit"
-              label="Edit"
-              hotkey="e"
-              onPress={() => void update($, flowAtom, now => ({ ...now, isEditing: true }))}
-            />
-          )}
+          <Button key="pu-run" label="Run it" variant="primary" hotkey="r" onPress={() => send($, text)} />
+          <Button key="pu-edit" label="Edit in prompt box" hotkey="e" onPress={() => editInBox($, text)} />
           <Button
             key="pu-copy"
             label="Copy"
             hotkey="c"
             onPress={async press => {
               try {
-                const copied = await $.ui.copy({ text: flow.upgraded, surface: press.surface })
+                const copied = await $.ui.copy({ text, surface: press.surface })
                 if (!copied.isCopied) $.ui.toast("Couldn't copy here.")
               } catch {
                 $.ui.toast("Couldn't copy here.")
@@ -283,9 +268,25 @@ export const register: Register = on => {
             ))}
           </Box>
         )}
+        {Input && blanks.length > 0 && (
+          <Box key="pu-blanks" flexDirection="column">
+            <Text dimColor>FILL IN THE BLANKS</Text>
+            {blanks.map((name, i) => (
+              <Input
+                key={`pu-fill-${i}`}
+                label={`${name}: `}
+                placeholder="type what goes here"
+                value={flow.fills[name] ?? ''}
+                submitLabel="next"
+                onInput={value => void update($, flowAtom, now => ({ ...now, fills: { ...now.fills, [name]: value } }))}
+                onSubmit={() => undefined}
+              />
+            ))}
+          </Box>
+        )}
         <Box flexDirection={isNarrow ? 'column' : 'row'} gap={1}>
           {card('pu-original', 'YOUR PROMPT', flow.original, PASTEL.stopped)}
-          {card('pu-upgraded', 'THE UPGRADE', flow.upgraded, PASTEL.working)}
+          {card('pu-upgraded', 'THE UPGRADE', text, PASTEL.working)}
         </Box>
       </Box>
     )
