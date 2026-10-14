@@ -2,22 +2,22 @@
 // match. Each mod keeps its own copy (a plugin cannot import another's files):
 // when you change one, change the same file in the other mods.
 //
-// Orange is the theme's own accent. The rest sit halfway between the theme's
-// colour and a pastel of it: softer than the theme, but still easy to tell apart.
-// They are fixed hex values, so they do not follow the theme. Unlit bars and dim
-// text still use the theme.
+// Orange is the theme's own accent. The rest are softer than the theme's colours
+// but more saturated than a pastel, picked so every pair is easy to tell apart
+// (at least 30 apart in CIELAB colour distance). They are fixed hex values, so
+// they do not follow the theme. Unlit bars and dim text still use the theme.
 
 export const PASTEL = {
   /** In progress, and the accent: titles, lit bars, the star. The theme's orange. */
   working: '#d4743c',
-  /** Waiting for the person's reply. A medium-soft blue. */
-  waiting: '#94afca',
-  /** Stuck, or a warning. A medium-soft yellow. */
-  stuck: '#edd29d',
-  /** Done, and on in a switch. A medium-soft green. */
-  done: '#b1c89e',
-  /** Stopped, off, and the original beside an upgrade. A medium-soft grey. */
-  stopped: '#8f949d',
-  /** Something went wrong. A medium-soft red. */
-  error: '#de868e',
+  /** Waiting for the person's reply. A clear blue. */
+  waiting: '#73a5de',
+  /** Stuck, or a warning. A warm yellow. */
+  stuck: '#f1ce7e',
+  /** Done, and on in a switch. A fresh green. */
+  done: '#9dcb86',
+  /** Stopped, off, and the original beside an upgrade. A neutral grey. */
+  stopped: '#787d87',
+  /** Something went wrong. A coral red. */
+  error: '#e67a85',
 } as const

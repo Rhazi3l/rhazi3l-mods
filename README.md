@@ -49,7 +49,7 @@ The Info panel shows no usage figures, so they don't sit in two places. Claude C
 
 ## Colours
 
-All the mods draw with one palette (`hooks/palette.ts` in each mod): the theme's own orange for working and accents, and softer colours halfway to a pastel for the rest (blue for waiting on you, yellow for stuck, green for done and on, grey for stopped and off, red for errors). They are fixed colours, so they do not follow the theme; unlit bars and dim text still do. A plugin cannot import another's files, so each mod keeps its own copy of `palette.ts`: change one, change all three. The status line script uses the same values.
+All the mods draw with one palette (`hooks/palette.ts` in each mod): the theme's own orange for working and accents, and clear, softened colours for the rest, picked so every pair is easy to tell apart (blue for waiting on you, yellow for stuck, green for done and on, grey for stopped and off, red for errors). They are fixed colours, so they do not follow the theme; unlit bars and dim text still do. A plugin cannot import another's files, so each mod keeps its own copy of `palette.ts`: change one, change all three. The status line script uses the same values.
 
 ## Adding a mod
 
