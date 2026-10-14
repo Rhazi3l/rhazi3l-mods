@@ -3,7 +3,7 @@ import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { asksSomething, meterCells } from '../hooks/register'
-import { cleanName, describeAction } from '../hooks/text'
+import { cleanName, describeAction, extractQuestion, quickReplies } from '../hooks/text'
 
 const PREFIX = 'mcp__clean-view__'
 const PLAN = 'mcp__clean-view__plan_steps'
@@ -51,12 +51,15 @@ const PANE = {
   },
 } as const
 
+const submitted: string[] = []
+
 /** The engine's own answers beneath the plugin. */
 async function startSession($: Engine, on: On) {
   mock.clock(on, { now: 1_000_000 })
   mock.store(on)
   on('session.start', ($, e) => ({ cwd: e.cwd }))
-  on('prompt.submit', ($, e) => ({ text: e.text }))
+  submitted.length = 0
+  on('prompt.submit', ($, e) => (submitted.push(e.text), { text: e.text }))
   on('turn.start', ($, e) => ({ turnId: e.turnId }))
   on('turn.complete', ($, e) => ({ text: e.answer }))
   on('prompt.compose', () => ({ sections: [] }))
@@ -261,6 +264,73 @@ describe('checklist', () => {
     expect(await pane.find({ key: 'clean-view-raw' })).toMatchObject({ text: 'Hide tool output' })
     await row.unmount()
     await pane.unmount()
+  })
+})
+
+describe('replying to a question', () => {
+  const OPTIONS = 'Ways to get a real review.\n\n1. I open both pages in Chrome.\n2. You export the doc.\n3. You paste the text here.\n\nI\'d go with option 1. Which do you want?'
+
+  test('the question is the last paragraph in plain words, and numbered options become replies', async () => {
+    expect(extractQuestion(OPTIONS)).toBe("I'd go with option 1. Which do you want?")
+    expect(extractQuestion('Done.\n\n**Want me to push it?**')).toBe('Want me to push it?')
+    expect(extractQuestion(`Intro.\n\n${'word '.repeat(100)}?`)).toStartWith('…')
+    expect(quickReplies(OPTIONS).map(r => r.text)).toEqual(['Option 1', 'Option 2', 'Option 3'])
+  })
+
+  test('a yes or no question gets Yes and No, an open one gets nothing', async () => {
+    expect(quickReplies('All set. Want me to push it?').map(r => r.label)).toEqual(['Yes', 'No'])
+    expect(quickReplies('Should I use the long name?').map(r => r.label)).toEqual(['Yes', 'No'])
+    expect(quickReplies('Which colour do you prefer?')).toEqual([])
+    expect(quickReplies('1. Only one point.\n\nWhat now?')).toEqual([])
+  })
+
+  test('the frame shows the question and a button per reply; pressing one sends it as the next message', async ($, on) => {
+    await startJob($, on)
+    await $.tool.call({ tool: PLAN, steps: ['Read your notes', 'Report back'] } as never)
+    await $.turn.complete({ turnId: 't1', answer: OPTIONS, reason: 'answer' } as never)
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect(await ui.find({ type: 'Text', text: /Needs you/ })).toBeDefined()
+      expect(await ui.find({ key: 'clean-view-question' })).toMatchObject({ text: expect.stringContaining('Which do you want?') })
+      expect(await ui.find({ key: 'clean-view-reply-0' })).toMatchObject({ text: 'Option 1', props: { variant: 'primary' } })
+      expect(await ui.find({ key: 'clean-view-reply-2' })).toMatchObject({ text: 'Option 3' })
+      expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: 'warning' } })
+      expect(await ui.find({ key: 'clean-view-replies' })).toMatchObject({ props: { flexWrap: 'wrap' } })
+      await ui.unmount()
+    }
+    submitted.length = 0
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await ui.press({ key: 'clean-view-reply-1' })
+    expect(submitted).toEqual(['Option 2'])
+    await ui.unmount()
+  })
+
+  test('an answer that asks after every step is done still waits for you, and your reply starts a new job', async ($, on) => {
+    await startJob($, on)
+    await $.tool.call({ tool: PLAN, steps: ['Read your notes'] } as never)
+    await $.tool.call({ tool: PROGRESS, task: 'Read your notes', percent: 100 } as never)
+    await $.turn.complete({ turnId: 't1', answer: 'All done. Want me to push it?', reason: 'answer' } as never)
+    const waiting = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await waiting.find({ type: 'Text', text: /Needs you/ })).toBeDefined()
+    expect(await waiting.find({ key: 'clean-view-reply-0' })).toMatchObject({ text: 'Yes' })
+    await waiting.unmount()
+
+    await $.prompt.submit({ text: 'Yes', wait: false, origin: RUN.origin })
+    await $.turn.start({ text: 'Yes', turnId: 't2' })
+    const next = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await next.find({ type: 'Text', text: /Needs you/ })).toBeUndefined()
+    expect(await next.find({ key: 'clean-view-question' })).toBeUndefined()
+    expect(await next.find({ type: 'Text', text: /Understand your request/ })).toBeDefined()
+    await next.unmount()
+  })
+
+  test('a permission prompt keeps the plain banner with no question or buttons', async ($, on) => {
+    await startJob($, on)
+    await $.classic.Notification({ message: 'Claude needs your permission to use Bash', notification_type: 'permission_prompt' })
+    const ui = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    expect(await ui.find({ type: 'Text', text: /needs your OK/ })).toBeDefined()
+    expect(await ui.find({ key: 'clean-view-question' })).toBeUndefined()
+    await ui.unmount()
   })
 })
 

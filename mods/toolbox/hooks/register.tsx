@@ -1,4 +1,4 @@
-// Info: a "◆ Info ▾" button at the right of the prompt footer that
+// Info: a "✦ Info ▾" button at the right of the prompt footer that
 // opens a small panel in the corner above it for the model, effort and the
 // other mods that are installed. Usage figures belong in Claude Code's own
 // status line setting, not here.
@@ -157,7 +157,7 @@ export const register: Register = on => {
             plain
             onPress={() => update($, toolboxOpenAtom, open => !open)}
           >
-            <Text color="claude">{'◆ '}</Text>
+            <Text color="claude">{'✦ '}</Text>
             <Text color={isOpen ? 'claude' : 'text'} bold={isOpen}>
               Info
             </Text>
@@ -205,7 +205,7 @@ export const register: Register = on => {
           <Box flexDirection="row" justifyContent="space-between">
             <Box flexGrow={1} flexShrink={1}>
               <Text bold color="claude" wrap="truncate-end">
-                ◆ Info
+                ✦ Info
               </Text>
             </Box>
             <Box flexShrink={0}>

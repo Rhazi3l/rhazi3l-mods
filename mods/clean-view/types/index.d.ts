@@ -38,6 +38,10 @@ export type Checklist = {
   phase: ChecklistPhase
   tasks: ChecklistTask[]
   needsYouReason: string | null
+  /** What Claude is asking while it waits for a reply: the end of its answer, in plain text. */
+  question: string
+  /** One-press replies for that question (numbered options, or Yes and No). */
+  replies: { label: string; text: string }[]
   stuckReason: string | null
   startedAt: number | null
   finishedAt: number | null

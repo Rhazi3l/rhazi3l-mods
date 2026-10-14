@@ -260,3 +260,31 @@ export function firstLine(text: unknown, max = 160): string {
   const line = String(text ?? '').split('\n').find(part => part.trim() !== '') ?? ''
   return oneLine(line, max)
 }
+
+/** What Claude is asking: the last paragraph of its answer, in plain text, cut to its last 240 characters. */
+export function extractQuestion(answer: string): string {
+  const last = (answer.trim().split(/\n\s*\n/).pop() ?? '').replace(/[*_`#>]+/g, '').replace(/\s+/g, ' ').trim()
+  return last.length > 240 ? `…${last.slice(-239)}` : last
+}
+
+const YES_NO_START = /^(do|does|did|should|shall|can|could|would|will|is|are|want|ok|okay|may)\b|\b(want me to|shall i|should i|ok to|okay to|would you like me to)\b/i
+
+/**
+ * One-press replies for a question: the numbered options it lists ("1.", "2)"), else
+ * Yes and No when it reads as a yes or no question. Empty when neither fits.
+ */
+export function quickReplies(answer: string): { label: string; text: string }[] {
+  const numbers = [...answer.matchAll(/^\s*(\d{1,2})[.)]\s+\S/gm)].map(match => Number(match[1]))
+  const options: number[] = []
+  for (const n of numbers) if (n === options.length + 1) options.push(n)
+  if (options.length >= 2 && options.length <= 5) {
+    return options.map(n => ({ label: `Option ${n}`, text: `Option ${n}` }))
+  }
+  if (YES_NO_START.test(extractQuestion(answer).replace(/^…/, ''))) {
+    return [
+      { label: 'Yes', text: 'Yes' },
+      { label: 'No', text: 'No' },
+    ]
+  }
+  return []
+}

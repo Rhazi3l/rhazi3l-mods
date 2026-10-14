@@ -14,11 +14,13 @@ import { COMMANDS, TOOLS } from './info'
 import {
   apiErrorSentence,
   cleanName,
+  extractQuestion,
   describeAction,
   describeFull,
   firstLine,
   formatDuration,
   isUserRefusal,
+  quickReplies,
   MAX_NAME,
   trimToWidth,
 } from './text'
@@ -52,6 +54,8 @@ const EMPTY: Checklist = {
   phase: 'idle',
   tasks: [],
   needsYouReason: null,
+  question: '',
+  replies: [],
   stuckReason: null,
   startedAt: null,
   finishedAt: null,
@@ -177,12 +181,12 @@ export function asksSomething(answer: string): boolean {
   return /\?[\s"'”)*_`]*$/.test(last.trim())
 }
 
-function setNeedsYou(c: Checklist, reason: string): Checklist {
-  return { ...c, phase: 'needsYou', needsYouReason: reason }
+function setNeedsYou(c: Checklist, reason: string, answer = ''): Checklist {
+  return { ...c, phase: 'needsYou', needsYouReason: reason, question: extractQuestion(answer), replies: answer === '' ? [] : quickReplies(answer) }
 }
 
 function clearNeedsYou(c: Checklist): Checklist {
-  return c.phase === 'needsYou' ? { ...c, phase: 'working', needsYouReason: null } : c
+  return c.phase === 'needsYou' ? { ...c, phase: 'working', needsYouReason: null, question: '', replies: [] } : c
 }
 
 function setStuck(c: Checklist, reason: string): Checklist {
@@ -342,7 +346,8 @@ export const register: Register = on => {
     const isNewJob =
       e.text.trim() !== '' &&
       !isCommandPrompt &&
-      (!isRunningPhase(current) || (current.phase === 'stuck' && !hasUnfinished(current)))
+      (!isRunningPhase(current) ||
+        ((current.phase === 'stuck' || current.phase === 'needsYou') && !hasUnfinished(current)))
     isCommandPrompt = false
     failStreak = 0
     lastApiError = undefined
@@ -380,7 +385,7 @@ export const register: Register = on => {
         })
       }
     } else if (isRunningPhase(current)) {
-      await update($, checklistAtom, (c): Checklist => ({ ...c, phase: 'working', needsYouReason: null, stuckReason: null }))
+      await update($, checklistAtom, (c): Checklist => ({ ...c, phase: 'working', needsYouReason: null, stuckReason: null, question: '', replies: [] }))
     }
     return started
   })
@@ -533,9 +538,9 @@ export const register: Register = on => {
       if (e.reason === 'refusal') return setStuck(c, STUCK_REFUSAL)
       if (e.reason === 'aborted') return { ...c, phase: 'stopped', needsYouReason: null, finishedAt: now }
       if (c.phase === 'stuck' && c.stuckReason === STUCK_REFUSED) return c
-      // Steps left open at the end of a turn mean Claude is waiting on the person only
-      // when its answer asks something; otherwise it simply answered without ticking them off.
-      if (c.hasRealPlan && hasUnfinished(c) && asksSomething(e.answer)) return setNeedsYou(c, REASON_REPLY)
+      // Claude is waiting on the person when its answer ends in a question, whatever the steps say;
+      // an answer that only left steps open simply did not tick them off.
+      if (asksSomething(e.answer)) return setNeedsYou(c, REASON_REPLY, e.answer)
       const tasks = c.tasks.map(t => ({ ...t, status: 'done' as const, percent: 100 }))
       return { ...c, tasks, phase: 'done', needsYouReason: null, stuckReason: null, finishedAt: now, isCollapsed: false }
     })
@@ -635,11 +640,36 @@ export const register: Register = on => {
         </Box>
       </Box>
     )
+    const waitsForReply = c.phase === 'needsYou' && c.question !== ''
+    // What Claude is asking, and one-press answers where the question has clear options.
+    const askRows = waitsForReply
+      ? [
+          <Box key="clean-view-question" flexShrink={1}>
+            <Text wrap="wrap">{c.question}</Text>
+          </Box>,
+          c.replies.length > 0 ? (
+            <Box key="clean-view-replies" flexDirection="row" flexWrap="wrap" gap={1}>
+              {c.replies.map((reply, i) => (
+                <Button
+                  key={`clean-view-reply-${i}`}
+                  label={reply.label}
+                  variant={i === 0 ? 'primary' : 'secondary'}
+                  onPress={() => {
+                    // Sent as the person's own words; the job carries on from it.
+                    void $.prompt.submit({ text: reply.text, asUser: true })
+                  }}
+                />
+              ))}
+            </Box>
+          ) : null,
+        ]
+      : []
     // The frame keeps the checklist apart from the reply; its colour says how the job stands.
+    // A job waiting on the person gets a heavier border, so it stands out from one still working.
     const frameColor =
       c.phase === 'done' ? 'success' : c.phase === 'needsYou' || c.phase === 'stuck' ? 'warning' : c.phase === 'stopped' ? 'inactive' : 'claude'
     const frame = (children: RenderChildren) => (
-      <Box key="clean-view-frame" flexDirection="column" borderStyle="round" borderColor={frameColor} paddingX={1}>
+      <Box key="clean-view-frame" flexDirection="column" borderStyle={c.phase === 'needsYou' ? 'bold' : 'round'} borderColor={frameColor} paddingX={1}>
         {children}
       </Box>
     )
@@ -722,7 +752,7 @@ export const register: Register = on => {
 
     return (
       <Box flexDirection="column">
-        {frame([headerRow, overallRow, ...rows])}
+        {frame([headerRow, ...askRows, overallRow, ...rows])}
         {below}
       </Box>
     )
