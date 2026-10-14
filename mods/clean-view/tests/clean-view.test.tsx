@@ -354,6 +354,29 @@ describe('the waiting colour', () => {
     }
   })
 
+  test('the pane shows the waiting colour now, every frame colour with when it shows, and updates when a colour is picked', async ($, on) => {
+    on('ui.open', () => ({ value: { isPlaced: true } }))
+    await startJob($, on)
+    for (const surface of SURFACES) {
+      const pane = await $.ui.mount({ ...SWATCHES, surface })
+      expect(await pane.find({ key: 'colour-preview' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: shadeOf('permission') } })
+      expect(await pane.find({ key: 'state-working' })).toMatchObject({ props: { borderColor: 'claude' } })
+      expect(await pane.find({ key: 'state-waiting' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: shadeOf('permission') } })
+      expect(await pane.find({ key: 'state-stuck' })).toMatchObject({ props: { borderColor: 'warning' } })
+      expect(await pane.find({ key: 'state-done' })).toMatchObject({ props: { borderColor: 'success' } })
+      expect(await pane.find({ key: 'state-stopped' })).toMatchObject({ props: { borderColor: 'inactive' } })
+      expect(await pane.find({ type: 'Text', text: /Soft blue \(your pick/ })).toBeDefined()
+      await pane.unmount()
+    }
+    const pane = await $.ui.mount({ ...SWATCHES, surface: 'terminal' })
+    await pane.press({ key: 'colour-use-green' })
+    expect(await pane.find({ key: 'colour-preview' })).toMatchObject({ props: { borderColor: shadeOf('success') } })
+    expect(await pane.find({ key: 'state-waiting' })).toMatchObject({ props: { borderColor: shadeOf('success') } })
+    expect(await pane.find({ key: 'colour-use-green' })).toMatchObject({ text: 'green (in use)' })
+    expect(await pane.find({ type: 'Text', text: /Soft green \(your pick/ })).toBeDefined()
+    await pane.unmount()
+  })
+
   test('pressing Use changes the frame of a job that is waiting, and /view colour does the same', async ($, on) => {
     await startJob($, on)
     await $.turn.complete({ turnId: 't1', answer: 'Which one do you want?', reason: 'answer' } as never)

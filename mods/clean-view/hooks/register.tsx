@@ -806,32 +806,92 @@ export const register: Register = on => {
     )
   })
 
-  // The colour samples: how each choice looks as the waiting frame, with a button to pick it.
+  // The colour pane: the waiting frame as it stands, every frame colour with when it is used,
+  // and the six pastels to pick the waiting colour from.
   on('ui.render', { component: 'Pane', requestId: COLOURS_PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const current = await read($, waitColourAtom)
+    const shade = shadeOf(current)
+    const currentName = WAIT_COLOURS.find(colour => colour.key === current)?.name ?? WAIT_COLOURS[0].name
+
+    const heading = (text: string) => (
+      <Text bold dimColor>
+        {text}
+      </Text>
+    )
+    const waitingHeader = (colour: string) => (
+      <Text wrap="wrap">
+        <Text backgroundColor={colour} color="inverseText" bold>
+          {' Needs you '}
+        </Text>
+        {' Claude is waiting for your reply'}
+      </Text>
+    )
+    // One frame as the checklist draws it, with a line on when it appears.
+    const frame = (key: string, borderStyle: 'round' | 'bold', color: string, header: RenderChildren, when: string, extra?: RenderChildren) => (
+      <Box key={key} flexDirection="column" borderStyle={borderStyle} borderColor={color} paddingX={1}>
+        {header}
+        {extra}
+        <Text dimColor wrap="wrap">
+          {when}
+        </Text>
+      </Box>
+    )
+
     return (
       <Box flexDirection="column" gap={1}>
-        <Text dimColor wrap="wrap">
-          How each colour looks as the frame while Claude waits for your reply. Press Use on your pick.
-        </Text>
+        {heading('YOUR WAITING COLOUR')}
+        {frame(
+          'colour-preview',
+          'bold',
+          shade,
+          waitingHeader(shade),
+          `Soft ${currentName}. This is how the frame looks now while Claude waits for you.`,
+          <Text wrap="wrap">Which one do you want?</Text>,
+        )}
+
+        {heading('EVERY FRAME COLOUR, AND WHEN IT SHOWS')}
+        {frame(
+          'state-working',
+          'round',
+          'claude',
+          <Text bold color="claude" wrap="wrap">{'✱ Working on your request'}</Text>,
+          'Orange (your theme): Claude is working through the steps.',
+        )}
+        {frame(
+          'state-waiting',
+          'bold',
+          shade,
+          waitingHeader(shade),
+          `Soft ${currentName} (your pick, below): Claude asked you something, or needs an OK, and is waiting.`,
+        )}
+        {frame(
+          'state-stuck',
+          'round',
+          'warning',
+          <Text color="warning" wrap="wrap">{'⚠ Stuck: a step keeps failing'}</Text>,
+          'Amber (your theme): a step keeps failing, you refused one, or an error stopped the job.',
+        )}
+        {frame(
+          'state-done',
+          'round',
+          'success',
+          <Text color="success" wrap="wrap">{'✓ All done'}</Text>,
+          'Green (your theme): the job finished with nothing left to ask.',
+        )}
+        {frame(
+          'state-stopped',
+          'round',
+          'inactive',
+          <Text wrap="wrap">{'■ Stopped · you pressed Esc'}</Text>,
+          'Grey (your theme): you interrupted the job.',
+        )}
+
+        {heading('PICK THE WAITING COLOUR')}
         {WAIT_COLOURS.map(colour => (
-          <Box
-            key={`colour-${colour.name}`}
-            flexDirection="column"
-            borderStyle="bold"
-            borderColor={colour.shade}
-            paddingX={1}
-          >
+          <Box key={`colour-${colour.name}`} flexDirection="column" borderStyle="bold" borderColor={colour.shade} paddingX={1}>
             <Box flexDirection="row" flexWrap="wrap" justifyContent="space-between">
-              <Box flexShrink={1}>
-                <Text wrap="wrap">
-                  <Text backgroundColor={colour.shade} color="inverseText" bold>
-                    {' Needs you '}
-                  </Text>
-                  {' Claude is waiting for your reply'}
-                </Text>
-              </Box>
+              <Box flexShrink={1}>{waitingHeader(colour.shade)}</Box>
               <Button
                 key={`colour-use-${colour.name}`}
                 label={colour.key === current ? `${colour.name} (in use)` : `Use ${colour.name}`}
