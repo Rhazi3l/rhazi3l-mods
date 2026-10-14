@@ -2,6 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine, MockClock } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+import { PASTEL } from '../hooks/palette'
 import { buildRequest, countWords, parseUpgrade } from '../hooks/text'
 
 const SURFACES = ['terminal', 'desktop'] as const
@@ -112,7 +113,7 @@ describe('the /better flow', () => {
     for (const surface of SURFACES) {
       const wide = await $.ui.mount({ ...PANE, surface })
       expect(JSON.stringify(await wide.find({ key: 'pu-run' }))).toBeDefined()
-      expect(JSON.stringify(await wide.find({ key: 'pu-upgraded' }))).toContain('"borderColor":"claude"')
+      expect(JSON.stringify(await wide.find({ key: 'pu-upgraded' }))).toContain(`"borderColor":"${PASTEL.working}"`)
       await wide.unmount()
       const narrow = await $.ui.mount({ ...PANE, surface, props: { ...PANE.props, bodyColumns: 50 } })
       expect(await narrow.find({ key: 'pu-upgraded' })).toBeDefined()

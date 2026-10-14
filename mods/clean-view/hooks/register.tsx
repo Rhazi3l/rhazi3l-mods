@@ -11,6 +11,7 @@ import type { Register, RenderChildren, Timer } from 'claude-code'
 
 import type { Checklist, ChecklistAction, ChecklistTask, CleanViewStyle, ViewMode } from '../types'
 import { COMMANDS, TOOLS } from './info'
+import { PASTEL } from './palette'
 import {
   apiErrorSentence,
   cleanName,
@@ -40,7 +41,7 @@ const COLLAPSE_MS = 5000
 const MAX_ACTIONS = 300
 const DETAILS_PANE = 'clean-view-details'
 const DETAILS_TITLE = 'What Claude did'
-const COLOURS_TITLE = 'Waiting colour'
+const COLOURS_TITLE = 'Frame colours'
 const FAILS_BEFORE_STUCK = 3
 
 const REASON_PERMISSION = 'Claude needs your OK to continue'
@@ -70,28 +71,9 @@ const EMPTY: Checklist = {
 // $.store too, so they last past the session; the toolbox reads `isOn`.
 const STORE_ON = 'isOn'
 const STORE_STYLE = 'style'
-const STORE_WAIT_COLOUR = 'waitColour'
 const COLOURS_PANE = 'clean-view-colours'
-/**
- * The colours offered for the frame while Claude waits for a reply, by the name the person
- * uses. `key` is the theme colour each began as and is what is saved; `shade` is the soft
- * pastel drawn (the theme colour lifted toward white), easier on the eyes than the theme's own.
- */
-export const WAIT_COLOURS = [
-  { name: 'blue', key: 'permission', shade: '#a8bdd2', note: "soft blue, close to Claude Code's own questions" },
-  { name: 'cyan', key: 'suggestion', shade: '#add2dd', note: 'soft cyan, a little brighter than blue' },
-  { name: 'amber', key: 'warning', shade: '#efdaaf', note: 'soft yellow, near the stuck-job amber' },
-  { name: 'red', key: 'error', shade: '#e39da3', note: 'soft red, the loudest; reads as an error' },
-  { name: 'green', key: 'success', shade: '#bfd1af', note: 'soft green, near the finished-job green' },
-  { name: 'orange', key: 'claude', shade: '#de9e79', note: 'soft orange, near a job in progress' },
-] as const
-const DEFAULT_WAIT_COLOUR = 'permission'
-/** The pastel drawn for a saved colour key. */
-export const shadeOf = (key: string): string => WAIT_COLOURS.find(colour => colour.key === key)?.shade ?? WAIT_COLOURS[0].shade
-const isWaitColour = (key: unknown): key is string => WAIT_COLOURS.some(colour => colour.key === key)
 const isOnAtom = atom({ plugin: 'clean-view', key: 'isOn' } as const, true)
 const styleAtom = atom({ plugin: 'clean-view', key: 'style' } as const, 'guided')
-const waitColourAtom = atom({ plugin: 'clean-view', key: 'waitColour' } as const, DEFAULT_WAIT_COLOUR)
 const checklistAtom = atom({ plugin: 'clean-view', key: 'checklist' } as const, EMPTY)
 const tickAtom = atom({ plugin: 'clean-view', key: 'tick' } as const, 0)
 const rawAtom = atom({ plugin: 'clean-view', key: 'showsRaw' } as const, false)
@@ -306,8 +288,6 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const savedOn = await $.store.get(STORE_ON)
     const savedStyle = await $.store.get(STORE_STYLE)
-    const savedColour = await $.store.get(STORE_WAIT_COLOUR)
-    await update($, waitColourAtom, () => (isWaitColour(savedColour) ? savedColour : DEFAULT_WAIT_COLOUR))
     // Written even when unchanged, so other mods can tell Clean View is installed.
     await update($, isOnAtom, () => (typeof savedOn === 'boolean' ? savedOn : true))
     await update($, styleAtom, (): CleanViewStyle => (savedStyle === 'simple' ? 'simple' : 'guided'))
@@ -334,17 +314,9 @@ export const register: Register = on => {
       const opened = await $.ui.open({ id: COLOURS_PANE, title: COLOURS_TITLE })
       return {
         text: opened.isPlaced
-          ? 'Colour samples open: press Use on the one you want for the waiting frame.'
-          : `The colour samples will show when there is room (${opened.reason}).`,
+          ? 'Frame colours open: every colour the checklist uses, and when.'
+          : `The frame colours will show when there is room (${opened.reason}).`,
       }
-    }
-    const picked = /^colou?r\s+(\w+)$/.exec(arg)
-    if (picked) {
-      const colour = WAIT_COLOURS.find(c => c.name === picked[1])
-      if (!colour) return { text: `Pick one of: ${WAIT_COLOURS.map(c => c.name).join(', ')}.` }
-      await update($, waitColourAtom, () => colour.key)
-      await $.store.set(STORE_WAIT_COLOUR, colour.key)
-      return { text: `The waiting frame is now ${colour.name}.` }
     }
     if (arg === 'on' || arg === 'off' || arg === 'full') {
       const isOn = arg === 'on'
@@ -605,7 +577,6 @@ export const register: Register = on => {
     const below = await next(e)
 
     const { Box, Text, Button } = $.ui.resolve(e)
-    const waitColour = shadeOf(await read($, waitColourAtom))
     const tick = await read($, tickAtom)
     const now = await $.clock.now()
     const style = await read($, styleAtom)
@@ -639,14 +610,14 @@ export const register: Register = on => {
     )
     const elapsed = formatDuration((c.finishedAt ?? now) - c.startedAt)
     let header = (
-      <Text bold color="claude" wrap="truncate-end">
+      <Text bold color={PASTEL.working} wrap="truncate-end">
         {`✱ ${c.title}`}
       </Text>
     )
     if (c.phase === 'needsYou') {
       header = (
         <Text wrap="truncate-end">
-          <Text backgroundColor={waitColour} color="inverseText" bold>
+          <Text backgroundColor={PASTEL.waiting} color="inverseText" bold>
             {' Needs you '}
           </Text>
           {` ${c.needsYouReason ?? REASON_REPLY}`}
@@ -654,7 +625,7 @@ export const register: Register = on => {
       )
     } else if (c.phase === 'stuck') {
       header = (
-        <Text color="warning" wrap="truncate-end">
+        <Text color={PASTEL.stuck} wrap="truncate-end">
           {`⚠ Stuck: ${c.stuckReason ?? STUCK_FAILING}`}
         </Text>
       )
@@ -662,7 +633,7 @@ export const register: Register = on => {
       header = <Text wrap="truncate-end">{`■ Stopped · ${c.title} · you pressed Esc`}</Text>
     } else if (c.phase === 'done') {
       header = (
-        <Text color="success" wrap="truncate-end">
+        <Text color={PASTEL.done} wrap="truncate-end">
           {`✓ All done · ${c.title}`}
         </Text>
       )
@@ -708,14 +679,14 @@ export const register: Register = on => {
     // A job waiting on the person gets a heavier border, so it stands out from one still working.
     const frameColor =
       c.phase === 'done'
-        ? 'success'
+        ? PASTEL.done
         : c.phase === 'needsYou'
-          ? waitColour // blue unless the person picked another (/view colours)
+          ? PASTEL.waiting
           : c.phase === 'stuck'
-            ? 'warning'
+            ? PASTEL.stuck
             : c.phase === 'stopped'
-              ? 'inactive'
-              : 'claude'
+              ? PASTEL.stopped
+              : PASTEL.working
     const frame = (children: RenderChildren) => (
       <Box key="clean-view-frame" flexDirection="column" borderStyle={c.phase === 'needsYou' ? 'bold' : 'round'} borderColor={frameColor} paddingX={1}>
         {children}
@@ -740,9 +711,9 @@ export const register: Register = on => {
       total > 0 && c.phase !== 'done' ? (
         <Box key="clean-view-overall" flexDirection="row">
           <Text dimColor>{`${stepText} `}</Text>
-          <Text color="claude">{'━'.repeat(overallFilled)}</Text>
+          <Text color={PASTEL.working}>{'━'.repeat(overallFilled)}</Text>
           <Text color="subtle">{'━'.repeat(overallCells - overallFilled)}</Text>
-          <Text bold color="claude">{` ${String(overall).padStart(3)}%`}</Text>
+          <Text bold color={PASTEL.working}>{` ${String(overall).padStart(3)}%`}</Text>
         </Box>
       ) : null
 
@@ -766,7 +737,7 @@ export const register: Register = on => {
               : 'Up next'
       const row = (
         <Box key={`task-${task.id}`} flexDirection="row">
-          <Text color={task.status === 'done' ? 'success' : isActive ? 'claude' : undefined} dimColor={task.status === 'upcoming'}>
+          <Text color={task.status === 'done' ? PASTEL.done : isActive ? PASTEL.working : undefined} dimColor={task.status === 'upcoming'}>
             {`${icon} `}
           </Text>
           <Box key="name" {...(isTerminal ? { width: nameWidth + 1, flexShrink: 0 } : { flexGrow: 1, flexShrink: 1 })}>
@@ -776,7 +747,7 @@ export const register: Register = on => {
           </Box>
           <Box key="meter" flexDirection="row" flexShrink={0}>
             {meterRuns(meterCells(task, tick)).map((run, r) => (
-              <Text key={`meter-${task.id}-${r}`} color={!run.lit ? 'subtle' : task.status === 'done' ? 'success' : 'claude'}>
+              <Text key={`meter-${task.id}-${r}`} color={!run.lit ? 'subtle' : task.status === 'done' ? PASTEL.done : PASTEL.working}>
                 {run.text}
               </Text>
             ))}
@@ -792,7 +763,7 @@ export const register: Register = on => {
         row,
         <Box key="clean-view-trail" flexDirection="row" paddingLeft={2}>
           <Text dimColor wrap="truncate-end">{`↳ ${latest.icon} ${latest.detail || latest.label}`}</Text>
-          {latest.isFailed && <Text color="error">{" · didn't work"}</Text>}
+          {latest.isFailed && <Text color={PASTEL.error}>{" · didn't work"}</Text>}
           {count > 1 && <Text dimColor>{` · ${count} actions`}</Text>}
         </Box>,
       ]
@@ -806,105 +777,60 @@ export const register: Register = on => {
     )
   })
 
-  // The colour pane: the waiting frame as it stands, every frame colour with when it is used,
-  // and the six pastels to pick the waiting colour from.
+  // The colour legend: each frame colour the checklist uses, and when it shows.
   on('ui.render', { component: 'Pane', requestId: COLOURS_PANE }, async ($, e) => {
-    const { Box, Text, Button } = $.ui.resolve(e)
-    const current = await read($, waitColourAtom)
-    const shade = shadeOf(current)
-    const currentName = WAIT_COLOURS.find(colour => colour.key === current)?.name ?? WAIT_COLOURS[0].name
-
-    const heading = (text: string) => (
-      <Text bold dimColor>
-        {text}
-      </Text>
-    )
-    const waitingHeader = (colour: string) => (
-      <Text wrap="wrap">
-        <Text backgroundColor={colour} color="inverseText" bold>
-          {' Needs you '}
-        </Text>
-        {' Claude is waiting for your reply'}
-      </Text>
-    )
+    const { Box, Text } = $.ui.resolve(e)
     // One frame as the checklist draws it, with a line on when it appears.
-    const frame = (key: string, borderStyle: 'round' | 'bold', color: string, header: RenderChildren, when: string, extra?: RenderChildren) => (
+    const frame = (key: string, borderStyle: 'round' | 'bold', color: string, header: RenderChildren, when: string) => (
       <Box key={key} flexDirection="column" borderStyle={borderStyle} borderColor={color} paddingX={1}>
         {header}
-        {extra}
         <Text dimColor wrap="wrap">
           {when}
         </Text>
       </Box>
     )
-
     return (
       <Box flexDirection="column" gap={1}>
-        {heading('YOUR WAITING COLOUR')}
-        {frame(
-          'colour-preview',
-          'bold',
-          shade,
-          waitingHeader(shade),
-          `Soft ${currentName}. This is how the frame looks now while Claude waits for you.`,
-          <Text wrap="wrap">Which one do you want?</Text>,
-        )}
-
-        {heading('EVERY FRAME COLOUR, AND WHEN IT SHOWS')}
         {frame(
           'state-working',
           'round',
-          'claude',
-          <Text bold color="claude" wrap="wrap">{'✱ Working on your request'}</Text>,
-          'Orange (your theme): Claude is working through the steps.',
+          PASTEL.working,
+          <Text bold color={PASTEL.working} wrap="wrap">{'✱ Working on your request'}</Text>,
+          'Orange: Claude is working through the steps.',
         )}
         {frame(
           'state-waiting',
           'bold',
-          shade,
-          waitingHeader(shade),
-          `Soft ${currentName} (your pick, below): Claude asked you something, or needs an OK, and is waiting.`,
+          PASTEL.waiting,
+          <Text wrap="wrap">
+            <Text backgroundColor={PASTEL.waiting} color="inverseText" bold>
+              {' Needs you '}
+            </Text>
+            {' Claude is waiting for your reply'}
+          </Text>,
+          'Blue: Claude asked you something, or needs an OK, and is waiting.',
         )}
         {frame(
           'state-stuck',
           'round',
-          'warning',
-          <Text color="warning" wrap="wrap">{'⚠ Stuck: a step keeps failing'}</Text>,
-          'Amber (your theme): a step keeps failing, you refused one, or an error stopped the job.',
+          PASTEL.stuck,
+          <Text color={PASTEL.stuck} wrap="wrap">{'⚠ Stuck: a step keeps failing'}</Text>,
+          'Yellow: a step keeps failing, you refused one, or an error stopped the job.',
         )}
         {frame(
           'state-done',
           'round',
-          'success',
-          <Text color="success" wrap="wrap">{'✓ All done'}</Text>,
-          'Green (your theme): the job finished with nothing left to ask.',
+          PASTEL.done,
+          <Text color={PASTEL.done} wrap="wrap">{'✓ All done'}</Text>,
+          'Green: the job finished with nothing left to ask.',
         )}
         {frame(
           'state-stopped',
           'round',
-          'inactive',
+          PASTEL.stopped,
           <Text wrap="wrap">{'■ Stopped · you pressed Esc'}</Text>,
-          'Grey (your theme): you interrupted the job.',
+          'Grey: you interrupted the job.',
         )}
-
-        {heading('PICK THE WAITING COLOUR')}
-        {WAIT_COLOURS.map(colour => (
-          <Box key={`colour-${colour.name}`} flexDirection="column" borderStyle="bold" borderColor={colour.shade} paddingX={1}>
-            <Box flexDirection="row" flexWrap="wrap" justifyContent="space-between">
-              <Box flexShrink={1}>{waitingHeader(colour.shade)}</Box>
-              <Button
-                key={`colour-use-${colour.name}`}
-                label={colour.key === current ? `${colour.name} (in use)` : `Use ${colour.name}`}
-                variant={colour.key === current ? 'primary' : 'secondary'}
-                onPress={async () => {
-                  await update($, waitColourAtom, () => colour.key)
-                  await $.store.set(STORE_WAIT_COLOUR, colour.key)
-                }}
-              />
-            </Box>
-            <Text dimColor wrap="wrap">{`${colour.name}: ${colour.note}`}</Text>
-          </Box>
-        ))}
       </Box>
     )
   })
@@ -948,7 +874,7 @@ export const register: Register = on => {
     const groups = detailGroups(c).flatMap(group => {
       const isActive = group.status === 'active'
       const icon = group.status === 'done' ? '✓' : isActive ? '▶' : '○'
-      const color = group.status === 'done' ? 'success' : isActive ? 'claude' : undefined
+      const color = group.status === 'done' ? PASTEL.done : isActive ? PASTEL.working : undefined
       const head = (
         <Box key={`step-${group.step}`} flexDirection="row" marginTop={1}>
           <Text color={color} dimColor={group.status === 'upcoming'}>{`${icon} `}</Text>
@@ -964,7 +890,7 @@ export const register: Register = on => {
             <Text>{`${a.isHelper ? '🤖 ' : ''}${a.icon} `}</Text>
             <Text>{a.label}</Text>
             {a.detail !== '' && <Text dimColor wrap="truncate-end">{` · ${a.detail}`}</Text>}
-            {a.isFailed && <Text color="error">{" · didn't work"}</Text>}
+            {a.isFailed && <Text color={PASTEL.error}>{" · didn't work"}</Text>}
           </Box>
           {a.full !== '' && a.full !== a.detail && (
             <Box paddingLeft={3}>
@@ -975,7 +901,7 @@ export const register: Register = on => {
           )}
           {a.note !== '' && (
             <Box paddingLeft={3}>
-              <Text color="error" wrap="wrap">
+              <Text color={PASTEL.error} wrap="wrap">
                 {a.note}
               </Text>
             </Box>
@@ -989,7 +915,7 @@ export const register: Register = on => {
       <Box flexDirection="column">
         <Box flexDirection="row" justifyContent="space-between" flexWrap={e.surface === 'terminal' ? 'nowrap' : 'wrap'}>
           <Box flexDirection="row" flexShrink={1}>
-            <Text bold color="claude" wrap="truncate-end">
+            <Text bold color={PASTEL.working} wrap="truncate-end">
               {c.title}
             </Text>
             <Text dimColor>{`  ${summary}`}</Text>

@@ -2,7 +2,8 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { asksSomething, meterCells, shadeOf, WAIT_COLOURS } from '../hooks/register'
+import { PASTEL } from '../hooks/palette'
+import { asksSomething, meterCells } from '../hooks/register'
 import { cleanName, describeAction, extractQuestion, quickReplies } from '../hooks/text'
 
 const PREFIX = 'mcp__clean-view__'
@@ -146,9 +147,9 @@ describe('checklist', () => {
       expect(await ui.find({ type: 'Text', text: 'Up next' })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /▶/ })).toBeDefined()
       expect(await ui.find({ key: 'clean-view-style' })).toBeDefined()
-      expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'round', borderColor: 'claude' } })
+      expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.working } })
       expect(await ui.find({ key: 'clean-view-overall' })).toMatchObject({ text: expect.stringMatching(/Step 2 of 4 ━+ +40%/) })
-      expect(await ui.find({ type: 'Text', text: /^━{6}$/ })).toMatchObject({ props: { color: 'claude' } })
+      expect(await ui.find({ type: 'Text', text: /^━{6}$/ })).toMatchObject({ props: { color: PASTEL.working } })
       expect(await ui.find({ type: 'Text', text: /^━{4}$/ })).toMatchObject({ props: { color: 'subtle' } })
       await ui.unmount()
     }
@@ -162,7 +163,7 @@ describe('checklist', () => {
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await ui.find({ type: 'Text', text: /^✓ All done · / })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /^took / })).toBeDefined()
-    expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: 'success' } })
+    expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: PASTEL.done } })
     await ui.unmount()
   })
 
@@ -249,7 +250,7 @@ describe('checklist', () => {
       expect(await pane.find({ type: 'Text', text: 'Read your notes' })).toBeDefined()
       expect(await pane.find({ type: 'Text', text: '/tmp/notes/brand.md' })).toBeDefined()
       expect(await pane.find({ type: 'Text', text: 'hugo build --minify' })).toBeDefined()
-      expect(await pane.find({ type: 'Text', text: 'bash: hugo: command not found' })).toMatchObject({ props: { color: 'error' } })
+      expect(await pane.find({ type: 'Text', text: 'bash: hugo: command not found' })).toMatchObject({ props: { color: PASTEL.error } })
       expect(await pane.find({ type: 'Text', text: /2 actions · 1 didn't work/ })).toBeDefined()
       await pane.unmount()
     }
@@ -294,7 +295,7 @@ describe('replying to a question', () => {
       expect(await ui.find({ key: 'clean-view-question' })).toMatchObject({ text: expect.stringContaining('Which do you want?') })
       expect(await ui.find({ key: 'clean-view-reply-0' })).toMatchObject({ text: 'Option 1', props: { variant: 'primary' } })
       expect(await ui.find({ key: 'clean-view-reply-2' })).toMatchObject({ text: 'Option 3' })
-      expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: shadeOf('permission') } })
+      expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: PASTEL.waiting } })
       expect(await ui.find({ key: 'clean-view-replies' })).toMatchObject({ props: { flexWrap: 'wrap' } })
       await ui.unmount()
     }
@@ -334,69 +335,37 @@ describe('replying to a question', () => {
   })
 })
 
-describe('the waiting colour', () => {
-  const SWATCHES = { ...PANE, requestId: 'clean-view-colours' } as const
+describe('frame colours', () => {
+  const LEGEND = { ...PANE, requestId: 'clean-view-colours' } as const
 
-  test('the samples pane shows every colour as a frame with a Use button, on both surfaces', async ($, on) => {
+  test('/view colours opens a legend of every frame colour and when it shows, with nothing to pick', async ($, on) => {
     on('ui.open', () => ({ value: { isPlaced: true } }))
     await startJob($, on)
-    expect((await $.command.run({ command: 'view', args: 'colours', ...RUN })).text).toContain('Colour samples open')
+    expect((await $.command.run({ command: 'view', args: 'colours', ...RUN })).text).toContain('Frame colours open')
     for (const surface of SURFACES) {
-      const pane = await $.ui.mount({ ...SWATCHES, surface })
-      expect(WAIT_COLOURS).toHaveLength(6)
-      for (const { name, shade } of WAIT_COLOURS) {
-        expect(shade).toMatch(/^#[0-9a-f]{6}$/)
-        expect(await pane.find({ key: `colour-${name}` })).toMatchObject({ props: { borderStyle: 'bold', borderColor: shade } })
-        expect(await pane.find({ key: `colour-use-${name}` })).toBeDefined()
-      }
-      expect(await pane.find({ key: 'colour-use-blue' })).toMatchObject({ text: 'blue (in use)' })
+      const pane = await $.ui.mount({ ...LEGEND, surface })
+      expect(await pane.find({ key: 'state-working' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.working } })
+      expect(await pane.find({ key: 'state-waiting' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: PASTEL.waiting } })
+      expect(await pane.find({ key: 'state-stuck' })).toMatchObject({ props: { borderColor: PASTEL.stuck } })
+      expect(await pane.find({ key: 'state-done' })).toMatchObject({ props: { borderColor: PASTEL.done } })
+      expect(await pane.find({ key: 'state-stopped' })).toMatchObject({ props: { borderColor: PASTEL.stopped } })
+      expect(await pane.find({ type: 'Text', text: /^Blue: Claude asked you something/ })).toBeDefined()
+      expect(await pane.find({ type: 'Text', text: /^Yellow: a step keeps failing/ })).toBeDefined()
+      expect(await pane.find({ type: 'Button' })).toBeUndefined()
       await pane.unmount()
     }
   })
 
-  test('the pane shows the waiting colour now, every frame colour with when it shows, and updates when a colour is picked', async ($, on) => {
-    on('ui.open', () => ({ value: { isPlaced: true } }))
+  test('the checklist frame uses the same pastel for each state', async ($, on) => {
     await startJob($, on)
-    for (const surface of SURFACES) {
-      const pane = await $.ui.mount({ ...SWATCHES, surface })
-      expect(await pane.find({ key: 'colour-preview' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: shadeOf('permission') } })
-      expect(await pane.find({ key: 'state-working' })).toMatchObject({ props: { borderColor: 'claude' } })
-      expect(await pane.find({ key: 'state-waiting' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: shadeOf('permission') } })
-      expect(await pane.find({ key: 'state-stuck' })).toMatchObject({ props: { borderColor: 'warning' } })
-      expect(await pane.find({ key: 'state-done' })).toMatchObject({ props: { borderColor: 'success' } })
-      expect(await pane.find({ key: 'state-stopped' })).toMatchObject({ props: { borderColor: 'inactive' } })
-      expect(await pane.find({ type: 'Text', text: /Soft blue \(your pick/ })).toBeDefined()
-      await pane.unmount()
-    }
-    const pane = await $.ui.mount({ ...SWATCHES, surface: 'terminal' })
-    await pane.press({ key: 'colour-use-green' })
-    expect(await pane.find({ key: 'colour-preview' })).toMatchObject({ props: { borderColor: shadeOf('success') } })
-    expect(await pane.find({ key: 'state-waiting' })).toMatchObject({ props: { borderColor: shadeOf('success') } })
-    expect(await pane.find({ key: 'colour-use-green' })).toMatchObject({ text: 'green (in use)' })
-    expect(await pane.find({ type: 'Text', text: /Soft green \(your pick/ })).toBeDefined()
-    await pane.unmount()
-  })
-
-  test('pressing Use changes the frame of a job that is waiting, and /view colour does the same', async ($, on) => {
-    await startJob($, on)
+    const working = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    expect(await working.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: PASTEL.working } })
+    await working.unmount()
     await $.turn.complete({ turnId: 't1', answer: 'Which one do you want?', reason: 'answer' } as never)
-    const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await band.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: shadeOf('permission') } })
-
-    const pane = await $.ui.mount({ ...SWATCHES, surface: 'terminal' })
-    await pane.press({ key: 'colour-use-cyan' })
-    await pane.unmount()
-    const cyan = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await cyan.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: shadeOf('suggestion') } })
-    expect(await cyan.find({ type: 'Text', text: /^ Needs you $/ })).toMatchObject({ props: { backgroundColor: shadeOf('suggestion') } })
-    await cyan.unmount()
-
-    expect((await $.command.run({ command: 'view', args: 'colour red', ...RUN })).text).toBe('The waiting frame is now red.')
-    expect((await $.command.run({ command: 'view', args: 'colour pink', ...RUN })).text).toContain('Pick one of')
-    const red = await $.ui.mount({ ...BAND, surface: 'desktop' })
-    expect(await red.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: shadeOf('error') } })
-    await red.unmount()
-    await band.unmount()
+    const waiting = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    expect(await waiting.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'bold', borderColor: PASTEL.waiting } })
+    expect(await waiting.find({ type: 'Text', text: /^ Needs you $/ })).toMatchObject({ props: { backgroundColor: PASTEL.waiting } })
+    await waiting.unmount()
   })
 })
 

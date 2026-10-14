@@ -9,6 +9,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { UpgradeFlow } from '../types'
+import { PASTEL } from './palette'
 import { buildRequest, countWords, parseUpgrade } from './text'
 
 const PANE = 'prompt-upgrade'
@@ -136,7 +137,7 @@ export const register: Register = on => {
               }
             }}
           >
-            <Text color="claude">{'✦ '}</Text>
+            <Text color={PASTEL.working}>{'✦ '}</Text>
             <Text>Better</Text>
           </Button>
         </Box>
@@ -154,11 +155,11 @@ export const register: Register = on => {
     const isNarrow = (e.props.bodyColumns ?? 80) < NARROW
 
     const heading = (text: string) => (
-      <Text bold color="claude">
+      <Text bold color={PASTEL.working}>
         {text}
       </Text>
     )
-    const card = (key: string, title: string, body: string, color: 'claude' | 'inactive') => (
+    const card = (key: string, title: string, body: string, color: string) => (
       <Box
         key={key}
         flexDirection="column"
@@ -191,7 +192,7 @@ export const register: Register = on => {
       return (
         <Box flexDirection="column" gap={1}>
           {heading('Rewriting your prompt')}
-          {card('pu-original', 'YOUR PROMPT', flow.original, 'inactive')}
+          {card('pu-original', 'YOUR PROMPT', flow.original, PASTEL.stopped)}
           <Box flexDirection="row" flexWrap="wrap">
             {cancel}
           </Box>
@@ -202,13 +203,13 @@ export const register: Register = on => {
     if (flow.phase === 'error') {
       return (
         <Box flexDirection="column" gap={1}>
-          <Box key="pu-error" flexDirection="column" borderStyle="round" borderColor="warning" paddingX={1}>
-            <Text color="warning" bold>
+          <Box key="pu-error" flexDirection="column" borderStyle="round" borderColor={PASTEL.stuck} paddingX={1}>
+            <Text color={PASTEL.stuck} bold>
               Your prompt is safe.
             </Text>
             <Text wrap="wrap">{flow.note}</Text>
           </Box>
-          {card('pu-original', 'YOUR PROMPT', flow.original, 'inactive')}
+          {card('pu-original', 'YOUR PROMPT', flow.original, PASTEL.stopped)}
           <Box flexDirection="row" flexWrap="wrap" gap={1}>
             <Button key="pu-retry" label="Try again" variant="primary" hotkey="t" onPress={() => upgrade($, flow.original)} />
             <Button key="pu-send-original" label="Send my original" onPress={() => send($, flow.original)} />
@@ -283,8 +284,8 @@ export const register: Register = on => {
           </Box>
         )}
         <Box flexDirection={isNarrow ? 'column' : 'row'} gap={1}>
-          {card('pu-original', 'YOUR PROMPT', flow.original, 'inactive')}
-          {card('pu-upgraded', 'THE UPGRADE', flow.upgraded, 'claude')}
+          {card('pu-original', 'YOUR PROMPT', flow.original, PASTEL.stopped)}
+          {card('pu-upgraded', 'THE UPGRADE', flow.upgraded, PASTEL.working)}
         </Box>
       </Box>
     )

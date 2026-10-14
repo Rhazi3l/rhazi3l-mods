@@ -8,6 +8,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
 import type { ToolboxInfo } from '../types'
+import { PASTEL } from './palette'
 import { EFFORTS, MODELS, modelAlias, prettyModel } from './text'
 
 const toolboxOpenAtom = atom({ plugin: 'toolbox', key: 'toolboxOpen' } as const, false)
@@ -157,11 +158,11 @@ export const register: Register = on => {
             plain
             onPress={() => update($, toolboxOpenAtom, open => !open)}
           >
-            <Text color="claude">{'✦ '}</Text>
-            <Text color={isOpen ? 'claude' : 'text'} bold={isOpen}>
+            <Text color={PASTEL.working}>{'✦ '}</Text>
+            <Text color={isOpen ? PASTEL.working : 'text'} bold={isOpen}>
               Info
             </Text>
-            {isTerminal && <Text color={isOpen ? 'claude' : 'inactive'}>{isOpen ? ' ▴' : ' ▾'}</Text>}
+            {isTerminal && <Text color={isOpen ? PASTEL.working : PASTEL.stopped}>{isOpen ? ' ▴' : ' ▾'}</Text>}
           </Button>
         </Box>
       </Box>
@@ -199,12 +200,12 @@ export const register: Register = on => {
           alignSelf="flex-end"
           flexDirection="column"
           borderStyle="round"
-          borderColor="promptBorder"
+          borderColor={PASTEL.working}
           paddingX={1}
         >
           <Box flexDirection="row" justifyContent="space-between">
             <Box flexGrow={1} flexShrink={1}>
-              <Text bold color="claude" wrap="truncate-end">
+              <Text bold color={PASTEL.working} wrap="truncate-end">
                 ✦ Info
               </Text>
             </Box>
@@ -284,7 +285,7 @@ export const register: Register = on => {
                       $.ui.toast(await switchMod($, mod, !(now?.isOn ?? isOn)))
                     }}
                   >
-                    <Text color={isOn ? 'success' : 'inactive'}>{isOn ? '●' : '○'}</Text>
+                    <Text color={isOn ? PASTEL.done : PASTEL.stopped}>{isOn ? '●' : '○'}</Text>
                     {` ${mod.name}`}
                   </Button>
                 )),
