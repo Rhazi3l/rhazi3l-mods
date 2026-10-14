@@ -15,7 +15,7 @@ const EMPTY_INFO: ToolboxInfo = { model: '', effort: null }
 const toolboxInfoAtom = atom({ plugin: 'toolbox', key: 'toolboxInfo' } as const, EMPTY_INFO)
 
 const LABEL_WIDTH = 8
-const INSTALL_LINE = '/plugin install clean-view@rhazi3l-mods'
+const INSTALL_HINT = 'Clean View: `/plugin install clean-view --marketplace Rhazi3l/rhazi3l-mods`, Prompt Upgrade: `/plugin install prompt-upgrade --marketplace Rhazi3l/rhazi3l-mods`'
 
 /** A sibling mod the toolbox can switch: it owns its on/off value and a command that takes `on` and `off`. */
 type SiblingMod = { id: string; name: string; command: string; description: string }
@@ -27,11 +27,24 @@ const CLEAN_VIEW: SiblingMod = {
   description: 'A plain-English checklist above the prompt; Details shows every step and action',
 }
 
+const PROMPT_UPGRADE: SiblingMod = {
+  id: 'prompt-upgrade',
+  name: 'Prompt Upgrade',
+  command: 'better',
+  description: '/better turns a rough prompt into a clearer one; nothing is sent until you press Run it',
+}
+
+const SIBLINGS = [CLEAN_VIEW, PROMPT_UPGRADE]
+
 /** Each sibling mod with its on/off, or undefined while it isn't installed. */
 async function siblingStates($: EngineInterface): Promise<{ mod: SiblingMod; isOn: boolean | undefined }[]> {
-  // Clean View writes this value; the toolbox only reads it.
+  // Each mod writes its own value; the toolbox only reads them.
   const { value: cleanViewOn } = await $.state.get({ plugin: 'clean-view', key: 'isOn' } as const)
-  return [{ mod: CLEAN_VIEW, isOn: cleanViewOn }]
+  const { value: promptUpgradeOn } = await $.state.get({ plugin: 'prompt-upgrade', key: 'isOn' } as const)
+  return [
+    { mod: CLEAN_VIEW, isOn: cleanViewOn },
+    { mod: PROMPT_UPGRADE, isOn: promptUpgradeOn },
+  ]
 }
 
 async function installedMods($: EngineInterface) {
@@ -50,7 +63,7 @@ async function switchMod($: EngineInterface, mod: SiblingMod, isOn: boolean): Pr
 
 function findMod(query: string): SiblingMod | undefined {
   const wanted = query.trim().toLowerCase().replace(/[\s_]+/g, '-')
-  return [CLEAN_VIEW].find(mod => mod.id === wanted || mod.name.toLowerCase().replace(/\s+/g, '-') === wanted)
+  return SIBLINGS.find(mod => mod.id === wanted || mod.name.toLowerCase().replace(/\s+/g, '-') === wanted)
 }
 
 export const register: Register = on => {
@@ -106,7 +119,7 @@ export const register: Register = on => {
   on('command.run', { command: 'mods' }, async ($, e) => {
     const installed = await installedMods($)
     if (installed.length === 0) {
-      return { text: `No mods are installed yet. To add Clean View: \`${INSTALL_LINE}\`` }
+      return { text: `No mods are installed yet. To add one: ${INSTALL_HINT}` }
     }
     const args = e.args.trim()
     if (args === '') {

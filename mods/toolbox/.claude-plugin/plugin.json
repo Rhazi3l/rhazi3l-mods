@@ -1,6 +1,6 @@
 {
   "name": "toolbox",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A corner toolbox under the prompt for the model, effort and your other mods.",
   "author": { "name": "Rhazi3l" },
   "types": "./types/index.d.ts"

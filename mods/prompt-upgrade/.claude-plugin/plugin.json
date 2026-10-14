@@ -1,0 +1,7 @@
+{
+  "name": "prompt-upgrade",
+  "version": "1.0.0",
+  "description": "/better turns a rough prompt into a clearer one. A pane shows your prompt beside the upgrade, and nothing is sent until you press Run it.",
+  "author": { "name": "Rhazi3l" },
+  "types": "./types/index.d.ts"
+}

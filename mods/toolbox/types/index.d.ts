@@ -19,5 +19,9 @@ declare module 'claude-code' {
     'clean-view': {
       isOn: boolean
     }
+    /** Read only, as above: owned and written by the Prompt Upgrade mod. */
+    'prompt-upgrade': {
+      isOn: boolean
+    }
   }
 }

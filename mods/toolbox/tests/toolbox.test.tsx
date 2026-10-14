@@ -39,19 +39,21 @@ async function startSession($: Engine, on: On) {
   return ran
 }
 
-/** Stands in for the Clean View mod: its on/off value and its /view command; registered before the session starts. */
-function fakeCleanView(on: On, ran: string[]) {
-  let isOn = true
-  let version = 1
-  on('state.get', ($, e, next) =>
-    e.plugin === 'clean-view' && e.key === 'isOn' ? ({ value: { value: isOn, version } } as never) : next(e),
-  )
-  on('command.run', { command: 'view' }, ($, e) => {
-    ran.push(`view ${e.args}`)
-    isOn = e.args === 'on'
-    version += 1
-    return { text: 'ok' }
+/** Stands in for sibling mods: each one's on/off value and command; registered before the session starts. */
+function fakeMod(on: On, ran: string[], mods: readonly { id: string; command: string }[] = [{ id: 'clean-view', command: 'view' }]) {
+  const values = new Map(mods.map(mod => [mod.id, { isOn: true, version: 1 }]))
+  on('state.get', ($, e, next) => {
+    const held = e.key === 'isOn' ? values.get(e.plugin) : undefined
+    return held ? ({ value: { value: held.isOn, version: held.version } } as never) : next(e)
   })
+  for (const { id, command } of mods) {
+    on('command.run', { command }, ($, e) => {
+      ran.push(`${command} ${e.args}`)
+      const held = values.get(id)
+      if (held) values.set(id, { isOn: e.args === 'on', version: held.version + 1 })
+      return { text: 'ok' }
+    })
+  }
 }
 
 describe('toolbox words', () => {
@@ -107,13 +109,14 @@ describe('toolbox', () => {
       await band.unmount()
     }
     const listed = await $.command.run({ command: 'mods', args: '', ...RUN })
-    expect(listed.text).toContain('/plugin install clean-view@rhazi3l-mods')
+    expect(listed.text).toContain('/plugin install clean-view')
+    expect(listed.text).toContain('/plugin install prompt-upgrade')
   })
 
   test('with Clean View installed, its button runs /view off and on', async ($, on) => {
     const viewed: string[] = []
     const toasts: string[] = []
-    fakeCleanView(on, viewed)
+    fakeMod(on, viewed)
     on('ui.toast', ($, e) => (toasts.push(String(e.text)), { value: undefined }) as never)
     await startSession($, on)
     await $.command.run({ command: 'toolbox', args: '', ...RUN })
@@ -160,6 +163,27 @@ describe('toolbox', () => {
     expect(ran).toEqual(['effort max'])
     expect(await band.find({ key: 'effort-max' })).toMatchObject({ props: { variant: 'primary' } })
     await footer.unmount()
+    await band.unmount()
+  })
+
+  test('with Prompt Upgrade installed too, it gets its own button that runs /better off', async ($, on) => {
+    const ran: string[] = []
+    fakeMod(on, ran, [
+      { id: 'clean-view', command: 'view' },
+      { id: 'prompt-upgrade', command: 'better' },
+    ])
+    on('ui.toast', () => ({ value: undefined }) as never)
+    await startSession($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
+    for (const surface of SURFACES) {
+      const band = await $.ui.mount({ ...BAND, surface })
+      expect(await band.find({ key: 'mod-clean-view' })).toMatchObject({ text: '● Clean View' })
+      expect(await band.find({ key: 'mod-prompt-upgrade' })).toMatchObject({ text: '● Prompt Upgrade' })
+      await band.unmount()
+    }
+    const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await band.press({ key: 'mod-prompt-upgrade' })
+    expect(ran).toContain('better off')
     await band.unmount()
   })
 })
