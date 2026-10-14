@@ -2,10 +2,8 @@
 // API error sentences and time formatting. No engine calls, so tests import
 // them directly.
 
-import type { ActionKind } from '../types'
-
 export const MAX_NAME = 40
-export const FALLBACK_NAME = 'Working on it'
+const FALLBACK_NAME = 'Working on it'
 
 const CODE_EXTENSIONS =
   'ts|tsx|js|jsx|mjs|cjs|json|jsonc|py|rb|go|rs|java|kt|c|h|cpp|hpp|cs|sh|bash|zsh|fish|lua|toml|yaml|yml|md|html|css|scss|sql|php|swift|vue|svelte|ini|conf|cfg|env|lock|xml|qml|ipynb'
@@ -33,7 +31,7 @@ export function cleanName(raw: string): string {
     .filter(word => word && !word.includes('/') && !word.includes('\\') && !FILE_NAME.test(word))
   const text = words.join(' ').replace(/\s+/g, ' ').trim()
   if (!text) return FALLBACK_NAME
-  return trimToWidth(text[0].toUpperCase() + text.slice(1), MAX_NAME)
+  return trimToWidth(text.charAt(0).toUpperCase() + text.slice(1), MAX_NAME)
 }
 
 /** "45s", "1m 12s", "1h 3m". */
@@ -45,10 +43,8 @@ export function formatDuration(ms: number): string {
   return `${Math.floor(minutes / 60)}h ${minutes % 60}m`
 }
 
-export type ApiErrorKind = string | undefined
-
 /** One calm sentence for an API error that ended a turn. */
-export function apiErrorSentence(kind: ApiErrorKind, details?: string): string {
+export function apiErrorSentence(kind: string | undefined, details?: string): string {
   const text = (details ?? '').toLowerCase()
   if (/prompt is too long|context (window|length)|too many tokens|exceeds the context/.test(text)) {
     return 'type /compact and try again'
@@ -81,14 +77,13 @@ export function isUserRefusal(text: string | undefined): boolean {
 }
 
 export type ActionSummary = {
-  kind: ActionKind
   icon: string
   label: string
   detail: string
 }
 
 /** Tools that feed the checklist itself and never get a line of their own. */
-export const CHECKLIST_TOOLS = new Set([
+const CHECKLIST_TOOLS = new Set([
   'ToolSearch',
   'TodoWrite',
   'TaskCreate',
@@ -114,10 +109,10 @@ function shortUrl(url: unknown): string {
 }
 
 /** The program a shell command runs, plus its subcommand: "git push", "npm install". */
-export function commandHead(command: unknown): string {
+function commandHead(command: unknown): string {
   const first = String(command ?? '')
     .trim()
-    .split(/\s*(?:&&|\|\||;|\|)\s*/)[0]
+    .split(/\s*(?:&&|\|\||;|\|)\s*/)[0] ?? ''
   const tokens = first.split(/\s+/).filter(token => !/^[A-Z_][A-Z0-9_]*=/.test(token))
   const program = basename(tokens[0] ?? '')
   const sub = tokens[1]
@@ -126,7 +121,7 @@ export function commandHead(command: unknown): string {
 }
 
 /** Pretty name of an MCP server: "claude_ai_Gmail" → "Gmail". */
-export function serverName(server: string): string {
+function serverName(server: string): string {
   return words(server.replace(/^claude_ai_/i, '')) || server
 }
 
@@ -140,12 +135,11 @@ export function describeAction(tool: string, input: unknown, ownPrefix: string):
 
   switch (tool) {
     case 'Skill':
-      return { kind: 'skill', icon: '🧩', label: 'Used a skill', detail: String(args.skill ?? '') }
+      return { icon: '🧩', label: 'Used a skill', detail: String(args.skill ?? '') }
     case 'WebFetch':
-      return { kind: 'website', icon: '🌐', label: 'Read a website', detail: shortUrl(args.url) }
+      return { icon: '🌐', label: 'Read a website', detail: shortUrl(args.url) }
     case 'WebSearch':
       return {
-        kind: 'search',
         icon: '🔎',
         label: 'Searched the web',
         detail: `"${trimToWidth(String(args.query ?? ''), 60)}"`,
@@ -153,7 +147,6 @@ export function describeAction(tool: string, input: unknown, ownPrefix: string):
     case 'Agent':
     case 'Task':
       return {
-        kind: 'agent',
         icon: '🤖',
         label: 'Asked a helper agent',
         detail: `${String(args.subagent_type ?? 'general-purpose')}: "${trimToWidth(String(args.description ?? ''), 40)}"`,
@@ -161,41 +154,83 @@ export function describeAction(tool: string, input: unknown, ownPrefix: string):
     case 'Bash': {
       const head = commandHead(args.command)
       const what = args.description ? trimToWidth(String(args.description), 50) : 'A command'
-      return { kind: 'command', icon: '⌨️', label: 'Ran a command', detail: head ? `${what} (${head})` : what }
+      return { icon: '⌨️', label: 'Ran a command', detail: head ? `${what} (${head})` : what }
     }
     case 'Read':
-      return { kind: 'file', icon: '📄', label: 'Read a file', detail: basename(args.file_path) }
+      return { icon: '📄', label: 'Read a file', detail: basename(args.file_path) }
     case 'Edit':
     case 'NotebookEdit':
       return {
-        kind: 'file',
         icon: '✏️',
         label: 'Changed a file',
         detail: basename(args.file_path ?? args.notebook_path),
       }
     case 'Write':
-      return { kind: 'file', icon: '✏️', label: 'Wrote a file', detail: basename(args.file_path) }
+      return { icon: '✏️', label: 'Wrote a file', detail: basename(args.file_path) }
     case 'Grep':
       return {
-        kind: 'file',
         icon: '🔍',
         label: 'Searched inside files',
         detail: `"${trimToWidth(String(args.pattern ?? ''), 40)}"`,
       }
     case 'Glob':
-      return { kind: 'file', icon: '🔍', label: 'Looked for files', detail: String(args.pattern ?? '') }
+      return { icon: '🔍', label: 'Looked for files', detail: String(args.pattern ?? '') }
     case 'AskUserQuestion':
-      return { kind: 'question', icon: '💬', label: 'Asked you a question', detail: '' }
+      return { icon: '💬', label: 'Asked you a question', detail: '' }
   }
 
-  const mcp = /^mcp__(.+?)__(.+)$/.exec(tool)
-  if (mcp) {
+  const [, server, name] = /^mcp__(.+?)__(.+)$/.exec(tool) ?? []
+  if (server && name) {
     return {
-      kind: 'connector',
       icon: '🔌',
       label: 'Used an app connection',
-      detail: `${serverName(mcp[1])} → ${words(mcp[2])}`,
+      detail: `${serverName(server)} → ${words(name)}`,
     }
   }
-  return { kind: 'tool', icon: '⚙️', label: 'Used a tool', detail: tool }
+  return { icon: '⚙️', label: 'Used a tool', detail: tool }
+}
+
+/** Collapses whitespace and cuts to `max` characters, for the Details pane. */
+function oneLine(text: unknown, max: number): string {
+  const flat = String(text ?? '').replace(/\s+/g, ' ').trim()
+  return flat.length > max ? `${flat.slice(0, max - 1)}…` : flat
+}
+
+/**
+ * Everything worth seeing about a call for the Details pane: the whole
+ * command, path, address or query. '' when the one-line summary says it all.
+ */
+export function describeFull(tool: string, input: unknown): string {
+  const args = (input ?? {}) as Record<string, unknown>
+  switch (tool) {
+    case 'Bash':
+      return oneLine(args.command, 400)
+    case 'Read':
+    case 'Write':
+    case 'Edit':
+      return String(args.file_path ?? '')
+    case 'NotebookEdit':
+      return String(args.notebook_path ?? '')
+    case 'Grep':
+      return oneLine(`${String(args.pattern ?? '')}${args.path ? ` in ${String(args.path)}` : ''}${args.glob ? ` (${String(args.glob)})` : ''}`, 300)
+    case 'Glob':
+      return oneLine(`${String(args.pattern ?? '')}${args.path ? ` in ${String(args.path)}` : ''}`, 300)
+    case 'WebFetch':
+      return String(args.url ?? '')
+    case 'WebSearch':
+      return oneLine(args.query, 300)
+    case 'Agent':
+    case 'Task':
+      return oneLine(args.prompt, 300)
+    case 'Skill':
+      return oneLine(args.args, 300)
+  }
+  if (tool.startsWith('mcp__')) return tool
+  return ''
+}
+
+/** The first line of an error, for a failed action. */
+export function firstLine(text: unknown, max = 160): string {
+  const line = String(text ?? '').split('\n').find(part => part.trim() !== '') ?? ''
+  return oneLine(line, max)
 }

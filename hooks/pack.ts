@@ -6,7 +6,7 @@ import type { CommandSpec, ToolSpec } from 'claude-code'
 export type ModInfo = {
   /** Stable id: the key in `enabledMods`, and the prefix of its settings. */
   id: string
-  /** What the Mods row button says. */
+  /** What the toolbox's Mods button and /mods say. */
   name: string
   /** One line for /mods. */
   description: string

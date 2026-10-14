@@ -7,7 +7,7 @@ export const STYLE_SETTING = 'clean-view:style'
 export const CLEAN_VIEW: ModInfo = {
   id: 'clean-view',
   name: 'Clean View',
-  description: 'A plain-English checklist above the prompt, with short lines for what Claude does',
+  description: 'A plain-English checklist above the prompt; Details shows every step and action',
   isOnByDefault: true,
   tools: [
     {
@@ -41,8 +41,8 @@ export const CLEAN_VIEW: ModInfo = {
   commands: [
     {
       name: 'view',
-      description: 'Clean View: switch between Simple and Guided, or turn it on or off',
-      argumentHint: '[simple|guided|on|off]',
+      description: 'Clean View: Simple or Guided, Details for everything Claude did, or on and off',
+      argumentHint: '[simple|guided|details|on|off]',
       immediate: true,
     },
   ],

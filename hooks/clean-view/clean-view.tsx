@@ -1,11 +1,13 @@
-// Clean View: a calm checklist above the prompt and, in Guided view, one
-// plain line per action in place of the technical tool rows.
+// Clean View: a calm checklist above the prompt in place of the technical
+// tool rows, which it hides from the transcript.
 //
-// Views: Simple hides every tool row, Guided swaps each for a one-line
-// summary, Full (Clean View off) leaves Claude Code as it is.
+// Views: Simple shows the checklist alone, Guided adds the latest action under
+// the step in progress. The Details pane lists every step and every action of
+// the job in full, and can bring the engine's own tool rows back. Full (Clean
+// View off) leaves Claude Code as it is.
 
 import { atom, derive, read, update } from 'claude-code'
-import type { On, Timer } from 'claude-code'
+import type { On, RenderChildren, Timer } from 'claude-code'
 
 import type { Checklist, ChecklistAction, ChecklistTask, CleanViewStyle, ViewMode } from '../../types'
 import { isModOn } from '../catalog'
@@ -15,6 +17,8 @@ import {
   apiErrorSentence,
   cleanName,
   describeAction,
+  describeFull,
+  firstLine,
   formatDuration,
   isUserRefusal,
   MAX_NAME,
@@ -26,11 +30,12 @@ const PLAN_TOOL = 'mcp__rhazi3l-mods__plan_steps'
 const PROGRESS_TOOL = 'mcp__rhazi3l-mods__report_progress'
 
 const ALWAYS_ALLOWED = new Set(['ToolSearch', 'TodoWrite', 'TaskCreate', 'TaskUpdate', 'AskUserQuestion'])
-const STYLES: readonly CleanViewStyle[] = ['guided', 'simple']
 const METER = 10
 const TICK_MS = 250
 const COLLAPSE_MS = 5000
-const MAX_ACTIONS = 20
+const MAX_ACTIONS = 300
+const DETAILS_PANE = 'clean-view-details'
+const DETAILS_TITLE = 'What Claude did'
 const FAILS_BEFORE_STUCK = 3
 
 const REASON_PERMISSION = 'Claude needs your OK to continue'
@@ -59,16 +64,20 @@ const enabledModsAtom = atom({ plugin: 'rhazi3l-mods', key: 'enabledMods' } as c
 const modSettingsAtom = atom({ plugin: 'rhazi3l-mods', key: 'modSettings' } as const, {})
 const checklistAtom = atom({ plugin: 'rhazi3l-mods', key: 'checklist' } as const, EMPTY)
 const tickAtom = atom({ plugin: 'rhazi3l-mods', key: 'tick' } as const, 0)
+const rawAtom = atom({ plugin: 'rhazi3l-mods', key: 'cleanViewRaw' } as const, false)
 
 /** The style the person picked (Guided unless they chose Simple). */
 const styleAtom = derive([modSettingsAtom], (settings): CleanViewStyle =>
   settings[STYLE_SETTING] === 'simple' ? 'simple' : 'guided',
 )
 
-/** The view in force: the picked style, or `full` while the Mods row has Clean View off. */
+/** The view in force: the picked style, or `full` while Clean View is off. */
 const modeAtom = derive([styleAtom, enabledModsAtom], (style, mods): ViewMode =>
   isModOn(mods, 'clean-view') ? style : 'full',
 )
+
+/** Whether the transcript shows the engine's own tool rows: Clean View off, or Details asked for them. */
+const showsToolRowsAtom = derive([modeAtom, rawAtom], (mode, raw) => mode === 'full' || raw)
 
 const PROMPT_SECTION = `# Clean View checklist
 The person sees a plain-English checklist of your work instead of tool output.
@@ -106,7 +115,7 @@ function startFirstUpcoming(tasks: ChecklistTask[]): ChecklistTask[] {
   return i < 0 ? tasks : tasks.map((t, j) => (j === i ? { ...t, status: 'active', percent: 0 } : t))
 }
 
-export function applyPlan(c: Checklist, steps: readonly string[]): Checklist {
+function applyPlan(c: Checklist, steps: readonly string[]): Checklist {
   const tasks = steps.slice(0, 8).map<ChecklistTask>((name, i) => ({
     id: newId('s'),
     name: cleanName(name),
@@ -117,7 +126,7 @@ export function applyPlan(c: Checklist, steps: readonly string[]): Checklist {
   return { ...c, tasks, hasRealPlan: true }
 }
 
-export function applyProgress(c: Checklist, rawName: string, rawPercent: unknown): Checklist {
+function applyProgress(c: Checklist, rawName: string, rawPercent: unknown): Checklist {
   const name = cleanName(rawName)
   const percent = clampPercent(rawPercent)
   let tasks = c.hasRealPlan ? c.tasks.map(t => ({ ...t })) : []
@@ -137,16 +146,17 @@ export function applyProgress(c: Checklist, rawName: string, rawPercent: unknown
   })
 
   if (percent >= 100) {
-    tasks[i] = { ...tasks[i], status: 'done', percent: 100 }
     const next = tasks.findIndex((t, j) => j > i && t.status !== 'done')
-    if (next >= 0) tasks[next] = { ...tasks[next], status: 'active', percent: 0, hasReported: false }
+    tasks = tasks.map((t, j) =>
+      j === i ? { ...t, status: 'done', percent: 100 } : j === next ? { ...t, status: 'active', percent: 0, hasReported: false } : t,
+    )
   }
   return { ...c, tasks }
 }
 
 type Todo = { content: string; status: 'pending' | 'in_progress' | 'completed' }
 
-export function applyTodos(c: Checklist, todos: readonly Todo[]): Checklist {
+function applyTodos(c: Checklist, todos: readonly Todo[]): Checklist {
   const tasks = todos.map<ChecklistTask>((todo, i) => {
     const status = todo.status === 'completed' ? 'done' : todo.status === 'in_progress' ? 'active' : 'upcoming'
     const old = c.tasks[i]
@@ -186,43 +196,83 @@ function stopTicker() {
 function styleToast(style: CleanViewStyle): string {
   return style === 'simple'
     ? 'Clean View: Simple. Only the checklist shows.'
-    : 'Clean View: Guided. The checklist plus one short line per action.'
+    : 'Clean View: Guided. The checklist plus what Claude is doing right now.'
 }
 
 const styleLabel = (style: CleanViewStyle) => (style === 'simple' ? 'View: Simple' : 'View: Guided')
-const nextStyle = (style: CleanViewStyle) => STYLES[(STYLES.indexOf(style) + 1) % STYLES.length]
+const nextStyle = (style: CleanViewStyle): CleanViewStyle => (style === 'simple' ? 'guided' : 'simple')
 
 const NAME_SYSTEM =
   'Name the job described in the request in 2 to 6 plain English words, starting with a verb, like "Build my landing page". No file names, code or punctuation. Answer with the name only.'
 
 function jobTitleFrom(answer: string): string {
-  return cleanName(answer.split('\n')[0].replace(/^["'\s]+|["'.\s]+$/g, ''))
+  return cleanName((answer.split('\n')[0] ?? '').replace(/^["'\s]+|["'.\s]+$/g, ''))
 }
 
 function recordAction(c: Checklist, action: ChecklistAction): Checklist {
   return { ...c, actions: [...c.actions.filter(a => a.id !== action.id), action].slice(-MAX_ACTIONS) }
 }
 
+function markFailed(c: Checklist, id: string, note: string): Checklist {
+  return { ...c, actions: c.actions.map(a => (a.id === id ? { ...a, isFailed: true, note } : a)) }
+}
+
+/** The step a new action belongs to: the one in progress, else the last one started. */
+function currentStep(c: Checklist): string {
+  const active = c.tasks.find(t => t.status === 'active')
+  return active?.name ?? [...c.tasks].reverse().find(t => t.status === 'done')?.name ?? ''
+}
+
+/**
+ * The steps in the order the Details pane lists them: steps that only actions
+ * remember (the placeholders before a plan) first, then the plan.
+ */
+function detailGroups(c: Checklist): { step: string; status: ChecklistTask['status']; actions: ChecklistAction[] }[] {
+  const planned = new Set(c.tasks.map(t => t.name))
+  const earlier = [...new Set(c.actions.map(a => a.step).filter(step => !planned.has(step)))]
+  return [
+    ...earlier.map(step => ({ step, status: 'done' as const, actions: c.actions.filter(a => a.step === step) })),
+    ...c.tasks.map(t => ({ step: t.name, status: t.status, actions: c.actions.filter(a => a.step === t.name) })),
+  ]
+}
+
 // ---------- Drawing helpers ----------
+
+/** How far the whole job is: done steps, plus the reported share of the one in progress. */
+function overallPercent(tasks: readonly ChecklistTask[]): number {
+  if (tasks.length === 0) return 0
+  const done = tasks.filter(t => t.status === 'done').length
+  const active = tasks.find(t => t.status === 'active')
+  const partial = active?.hasReported ? active.percent / 100 : 0
+  return Math.round(((done + partial) / tasks.length) * 100)
+}
 
 function pad(text: string, width: number): string {
   const cut = trimToWidth(text, width)
   return cut + ' '.repeat(Math.max(0, width - cut.length))
 }
 
-function meterFor(task: ChecklistTask, tick: number): string {
-  if (task.status === 'done') return '█'.repeat(METER)
-  if (task.status === 'upcoming') return '░'.repeat(METER)
+/** A step's bar as lit and unlit cells (`━`, as the overall bar): full, empty, a share, or a moving run while no share is known. */
+export function meterCells(task: ChecklistTask, tick: number): boolean[] {
+  if (task.status === 'done') return Array.from({ length: METER }, () => true)
+  if (task.status === 'upcoming') return Array.from({ length: METER }, () => false)
   if (!task.hasReported) {
     const head = (tick % (METER + 3)) - 3
-    return Array.from({ length: METER }, (_, i) => (i >= head && i < head + 3 ? '█' : '░')).join('')
+    return Array.from({ length: METER }, (_, i) => i >= head && i < head + 3)
   }
   const filled = Math.round(task.percent / 10)
-  return '█'.repeat(filled) + '░'.repeat(METER - filled)
+  return Array.from({ length: METER }, (_, i) => i < filled)
 }
 
-function actionLine(a: { icon: string; label: string; detail: string }): string {
-  return `${a.icon} ${a.label}${a.detail ? ` · ${a.detail}` : ''}`
+/** Lit and unlit cells grouped into runs, so each run draws as one Text. */
+function meterRuns(cells: boolean[]): { lit: boolean; text: string }[] {
+  const runs: { lit: boolean; text: string }[] = []
+  for (const lit of cells) {
+    const last = runs[runs.length - 1]
+    if (last && last.lit === lit) last.text += '━'
+    else runs.push({ lit, text: '━' })
+  }
+  return runs
 }
 
 // ---------- Hooks ----------
@@ -230,6 +280,14 @@ function actionLine(a: { icon: string; label: string; detail: string }): string 
 export function registerCleanView(on: On) {
   on('command.run', { command: 'view' }, async ($, e) => {
     const arg = e.args.trim().toLowerCase()
+    if (arg === 'details') {
+      const opened = await $.ui.open({ id: DETAILS_PANE, title: DETAILS_TITLE })
+      return {
+        text: opened.isPlaced
+          ? 'Details open: every step and action of this job.'
+          : `Details will show when there is room (${opened.reason}).`,
+      }
+    }
     if (arg === 'on' || arg === 'off' || arg === 'full') {
       const isOn = arg === 'on'
       const written = await update($, enabledModsAtom, map => ({ ...map, 'clean-view': isOn }))
@@ -237,7 +295,9 @@ export function registerCleanView(on: On) {
       return { text: isOn ? 'Clean View is on.' : 'Clean View is off. Everything Claude does is shown in full.' }
     }
     if (arg !== '' && arg !== 'simple' && arg !== 'guided') {
-      return { text: 'Use /view simple, /view guided, /view on or /view off. With nothing after it, /view switches between Simple and Guided.' }
+      return {
+        text: 'Use /view simple, /view guided, /view details, /view on or /view off. With nothing after it, /view switches between Simple and Guided.',
+      }
     }
     const style = arg === '' ? nextStyle(await read($, styleAtom)) : (arg as CleanViewStyle)
     const written = await update($, modSettingsAtom, map => ({ ...map, [STYLE_SETTING]: style }))
@@ -274,7 +334,7 @@ export function registerCleanView(on: On) {
 
     if (isNewJob) {
       const now = await $.clock.now()
-      const written = await update($, checklistAtom, c => ({
+      const written = await update($, checklistAtom, (c): Checklist => ({
         ...EMPTY,
         jobId: c.jobId + 1,
         title: 'Working on your request',
@@ -282,6 +342,7 @@ export function registerCleanView(on: On) {
         tasks: placeholderTasks(),
         startedAt: now,
       }))
+      await update($, rawAtom, () => false)
       if (mode !== 'full') {
         const text = e.text
         const jobId = written.jobId
@@ -297,14 +358,14 @@ export function registerCleanView(on: On) {
         })
       }
       if (shouldTick(written, mode) && !ticker) {
-        ticker = $.clock.every(TICK_MS, () => {
-          void Promise.all([read($, checklistAtom), read($, modeAtom)]).then(([list, view]) =>
-            shouldTick(list, view) ? update($, tickAtom, n => n + 1) : stopTicker(),
-          )
+        ticker = $.clock.every(TICK_MS, async () => {
+          const [list, view] = await Promise.all([read($, checklistAtom), read($, modeAtom)])
+          if (shouldTick(list, view)) await update($, tickAtom, n => n + 1)
+          else stopTicker()
         })
       }
     } else if (isRunningPhase(current)) {
-      await update($, checklistAtom, c => ({ ...c, phase: 'working', needsYouReason: null, stuckReason: null }))
+      await update($, checklistAtom, (c): Checklist => ({ ...c, phase: 'working', needsYouReason: null, stuckReason: null }))
     }
     return started
   })
@@ -332,7 +393,24 @@ export function registerCleanView(on: On) {
   // the to-do list as the checklist, and the action trail.
   on('tool.call', async ($, e, next) => {
     const tool = String(e.tool)
-    if (e.agentId !== undefined || tool.startsWith(OWN_PREFIX)) return next(e)
+    if (tool.startsWith(OWN_PREFIX)) return next(e)
+    if (e.agentId !== undefined) {
+      // A helper agent's call: kept for the Details pane, nothing else.
+      const summary = describeAction(tool, e, OWN_PREFIX)
+      if (!summary) return next(e)
+      const id = e.tool_use_id ?? newId('a')
+      await update($, checklistAtom, c =>
+        isRunningPhase(c)
+          ? recordAction(c, { id, ...summary, full: describeFull(tool, e), step: currentStep(c), isHelper: true, isFailed: false, note: '' })
+          : c,
+      )
+      const ran = await next(e)
+      if (ran.deny !== undefined || ran.isError === true) {
+        const note = firstLine(ran.deny ?? ran.text)
+        await update($, checklistAtom, c => markFailed(c, id, note))
+      }
+      return ran
+    }
 
     const mode = await read($, modeAtom)
     const before = await read($, checklistAtom)
@@ -343,7 +421,17 @@ export function registerCleanView(on: On) {
     const summary = describeAction(tool, e, OWN_PREFIX)
     await update($, checklistAtom, c => {
       let changed = tool === 'AskUserQuestion' ? setNeedsYou(c, REASON_QUESTION) : clearNeedsYou(c)
-      if (summary) changed = recordAction(changed, { id: e.tool_use_id ?? newId('a'), ...summary, isFailed: false })
+      if (summary) {
+        changed = recordAction(changed, {
+          id: e.tool_use_id ?? newId('a'),
+          ...summary,
+          full: describeFull(tool, e),
+          step: currentStep(changed),
+          isHelper: false,
+          isFailed: false,
+          note: '',
+        })
+      }
       return changed
     })
 
@@ -394,12 +482,7 @@ export function registerCleanView(on: On) {
         changed = setStuck(changed, STUCK_FAILING)
       }
 
-      if (summary && isFailed) {
-        changed = {
-          ...changed,
-          actions: changed.actions.map(a => (a.id === e.tool_use_id ? { ...a, isFailed: true } : a)),
-        }
-      }
+      if (summary && isFailed && e.tool_use_id) changed = markFailed(changed, e.tool_use_id, firstLine(failText))
       return changed
     })
 
@@ -429,7 +512,7 @@ export function registerCleanView(on: On) {
     if (e.agentId !== undefined) return ended
 
     const now = await $.clock.now()
-    const written = await update($, checklistAtom, c => {
+    const written = await update($, checklistAtom, (c): Checklist => {
       if (c.startedAt === null) return c
       if (e.reason === 'error') return setStuck(c, apiErrorSentence(lastApiError?.kind, lastApiError?.details))
       if (e.reason === 'refusal') return setStuck(c, STUCK_REFUSAL)
@@ -455,33 +538,44 @@ export function registerCleanView(on: On) {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
 
-    const { Box, Text, Button } = $.ui.resolve(e)
     const mode = await read($, modeAtom)
     const c = await read($, checklistAtom)
-    const tick = await read($, tickAtom)
-    const now = await $.clock.now()
-    const width = Math.max(20, e.props.bodyColumns)
-
-    const style = await read($, styleAtom)
-    const button = (
-      <Button
-        key="clean-view-style"
-        label={styleLabel(style)}
-        onPress={async () => {
-          const chosen = nextStyle(await read($, styleAtom))
-          const written = await update($, modSettingsAtom, map => ({ ...map, [STYLE_SETTING]: chosen }))
-          await $.store.set(STORE_SETTINGS, written)
-          $.ui.toast(styleToast(chosen))
-        }}
-      />
-    )
-    const showsChecklist = mode !== 'full' && c.phase !== 'idle' && c.startedAt !== null
-
-    if (!showsChecklist) return next(e)
+    if (mode === 'full' || c.phase === 'idle' || c.startedAt === null) return next(e)
     const below = await next(e)
 
-    const elapsed = formatDuration((c.finishedAt ?? now) - (c.startedAt ?? now))
-    let header = <Text bold wrap="truncate-end">{`${c.title} · ${elapsed}`}</Text>
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const tick = await read($, tickAtom)
+    const now = await $.clock.now()
+    const style = await read($, styleAtom)
+    // Inside the frame: its border and padding take four columns.
+    const width = Math.max(20, e.props.bodyColumns - 4)
+
+    const buttons = (
+      <Box key="clean-view-buttons" flexDirection="row">
+        <Button
+          key="clean-view-details"
+          label="Details"
+          hotkey="d"
+          onPress={() => $.ui.open({ id: DETAILS_PANE, title: DETAILS_TITLE })}
+        />
+        <Button
+          key="clean-view-style"
+          label={styleLabel(style)}
+          onPress={async () => {
+            const chosen = nextStyle(await read($, styleAtom))
+            const written = await update($, modSettingsAtom, map => ({ ...map, [STYLE_SETTING]: chosen }))
+            await $.store.set(STORE_SETTINGS, written)
+            $.ui.toast(styleToast(chosen))
+          }}
+        />
+      </Box>
+    )
+    const elapsed = formatDuration((c.finishedAt ?? now) - c.startedAt)
+    let header = (
+      <Text bold color="claude" wrap="truncate-end">
+        {`✱ ${c.title}`}
+      </Text>
+    )
     if (c.phase === 'needsYou') {
       header = (
         <Text wrap="truncate-end">
@@ -502,32 +596,58 @@ export function registerCleanView(on: On) {
     } else if (c.phase === 'done') {
       header = (
         <Text color="success" wrap="truncate-end">
-          {`✓ All done · ${c.title} · took ${elapsed}`}
+          {`✓ All done · ${c.title}`}
         </Text>
       )
     }
 
+    const showsTime = c.phase === 'working' || c.phase === 'needsYou' || c.phase === 'done'
     const headerRow = (
       <Box key="clean-view-header" flexDirection="row" justifyContent="space-between">
         <Box flexGrow={1} flexShrink={1}>
           {header}
         </Box>
-        {button}
+        {showsTime && <Text dimColor>{`${c.phase === 'done' ? `took ${elapsed}` : elapsed}  `}</Text>}
+        {buttons}
+      </Box>
+    )
+    // The frame keeps the checklist apart from the reply; its colour says how the job stands.
+    const frameColor =
+      c.phase === 'done' ? 'success' : c.phase === 'needsYou' || c.phase === 'stuck' ? 'warning' : c.phase === 'stopped' ? 'inactive' : 'claude'
+    const frame = (children: RenderChildren) => (
+      <Box key="clean-view-frame" flexDirection="column" borderStyle="round" borderColor={frameColor} paddingX={1}>
+        {children}
       </Box>
     )
     if (c.phase === 'done' && c.isCollapsed) {
       return (
         <Box flexDirection="column">
-          {headerRow}
+          {frame([headerRow])}
           {below}
         </Box>
       )
     }
 
+    const total = c.tasks.length
+    const doneCount = c.tasks.filter(t => t.status === 'done').length
+    const overall = overallPercent(c.tasks)
+    const stepText = `Step ${Math.max(1, Math.min(total, doneCount + 1))} of ${total}`
+    const overallCells = Math.max(4, width - stepText.length - 7)
+    const overallFilled = Math.round((overall / 100) * overallCells)
+    const overallRow =
+      total > 0 && c.phase !== 'done' ? (
+        <Box key="clean-view-overall" flexDirection="row">
+          <Text dimColor>{`${stepText} `}</Text>
+          <Text color="claude">{'━'.repeat(overallFilled)}</Text>
+          <Text color="subtle">{'━'.repeat(overallCells - overallFilled)}</Text>
+          <Text bold color="claude">{` ${String(overall).padStart(3)}%`}</Text>
+        </Box>
+      ) : null
+
     const nameWidth = Math.max(8, Math.min(MAX_NAME, width - 24))
     const firstUpcoming = c.tasks.findIndex(t => t.status === 'upcoming')
-    const recent = c.actions.slice(-3)
-    const showsTrail = mode === 'guided' && recent.length > 0 && c.phase !== 'done'
+    const latest = c.actions.findLast(a => !a.isHelper)
+    const showsTrail = mode === 'guided' && latest !== undefined && c.phase !== 'done'
 
     const rows = c.tasks.flatMap((task, i) => {
       const isActive = task.status === 'active'
@@ -550,91 +670,150 @@ export function registerCleanView(on: On) {
           <Text bold={isActive} dimColor={!isActive}>
             {pad(task.name, nameWidth)}
           </Text>
-          <Text color={task.status === 'done' ? 'success' : isActive ? 'claude' : undefined} dimColor={task.status === 'upcoming'}>
-            {` ${meterFor(task, tick)}  `}
-          </Text>
+          <Text>{' '}</Text>
+          {meterRuns(meterCells(task, tick)).map((run, r) => (
+            <Text key={`meter-${task.id}-${r}`} color={!run.lit ? 'subtle' : task.status === 'done' ? 'success' : 'claude'}>
+              {run.text}
+            </Text>
+          ))}
+          <Text>{'  '}</Text>
           <Text dimColor={!isActive}>{label}</Text>
         </Box>
       )
-      if (!isActive || !showsTrail) return [row]
-      const trail = recent.map(a => `${a.isFailed ? '✗ ' : ''}${a.icon} ${a.detail || a.label}`).join('  ·  ')
+      if (!isActive || !showsTrail || !latest) return [row]
+      const count = c.actions.filter(a => a.step === task.name).length
       return [
         row,
-        <Box key="clean-view-trail" paddingLeft={2}>
-          <Text dimColor wrap="truncate-end">{`↳ ${trail}`}</Text>
+        <Box key="clean-view-trail" flexDirection="row" paddingLeft={2}>
+          <Text dimColor wrap="truncate-end">{`↳ ${latest.icon} ${latest.detail || latest.label}`}</Text>
+          {latest.isFailed && <Text color="error">{" · didn't work"}</Text>}
+          {count > 1 && <Text dimColor>{` · ${count} actions`}</Text>}
         </Box>,
       ]
     })
 
     return (
       <Box flexDirection="column">
-        {headerRow}
-        {rows}
+        {frame([headerRow, overallRow, ...rows])}
         {below}
       </Box>
     )
   })
 
-  // Tool rows in the transcript: hidden in Simple, one plain line in Guided.
-  on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
-    const mode = await read($, modeAtom)
-    if (mode === 'full') return next(e)
-    const { Box, Text } = $.ui.resolve(e)
-    const summary = describeAction(e.props.tool, e.props.input, OWN_PREFIX)
-    if (mode === 'simple' || !summary) return <Box />
+  // The Details pane: every step of the job and every action under it, in full.
+  on('ui.render', { component: 'Pane', requestId: DETAILS_PANE }, async ($, e) => {
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const c = await read($, checklistAtom)
+    const isRaw = await read($, rawAtom)
+    const now = await $.clock.now()
 
-    const isFailed = e.props.isErrored
-    const outcome = e.props.isInterrupted
-      ? 'stopped'
-      : isFailed
-        ? isUserRefusal(String(e.props.output ?? ''))
-          ? 'you said no'
-          : "didn't work"
-        : null
+    const rawButton = (
+      <Button
+        key="clean-view-raw"
+        label={isRaw ? 'Hide tool output' : 'Show tool output'}
+        hotkey="o"
+        onPress={async () => {
+          const shows = await update($, rawAtom, raw => !raw)
+          $.ui.toast(shows ? 'Tool rows and their output are back in the transcript.' : 'Transcript is clean again.')
+        }}
+      />
+    )
+    if (c.startedAt === null) {
+      return (
+        <Box flexDirection="column">
+          <Text dimColor>Nothing yet. Once Claude starts a job, every step and action shows here.</Text>
+        </Box>
+      )
+    }
+
+    const elapsed = formatDuration((c.finishedAt ?? now) - c.startedAt)
+    const failed = c.actions.filter(a => a.isFailed).length
+    const summary = [
+      `${c.actions.length} action${c.actions.length === 1 ? '' : 's'}`,
+      failed > 0 ? `${failed} didn't work` : null,
+      elapsed,
+    ]
+      .filter(Boolean)
+      .join(' · ')
+
+    const groups = detailGroups(c).flatMap(group => {
+      const isActive = group.status === 'active'
+      const icon = group.status === 'done' ? '✓' : isActive ? '▶' : '○'
+      const color = group.status === 'done' ? 'success' : isActive ? 'claude' : undefined
+      const head = (
+        <Box key={`step-${group.step}`} flexDirection="row" marginTop={1}>
+          <Text color={color} dimColor={group.status === 'upcoming'}>{`${icon} `}</Text>
+          <Text bold={group.status !== 'upcoming'} dimColor={group.status === 'upcoming'}>
+            {group.step || 'Getting started'}
+          </Text>
+          {group.actions.length > 0 && <Text dimColor>{`  ${group.actions.length}`}</Text>}
+        </Box>
+      )
+      const lines = group.actions.map(a => (
+        <Box key={`action-${a.id}`} flexDirection="column" paddingLeft={2}>
+          <Box flexDirection="row">
+            <Text>{`${a.isHelper ? '🤖 ' : ''}${a.icon} `}</Text>
+            <Text>{a.label}</Text>
+            {a.detail !== '' && <Text dimColor wrap="truncate-end">{` · ${a.detail}`}</Text>}
+            {a.isFailed && <Text color="error">{" · didn't work"}</Text>}
+          </Box>
+          {a.full !== '' && a.full !== a.detail && (
+            <Box paddingLeft={3}>
+              <Text color="subtle" wrap="wrap">
+                {a.full}
+              </Text>
+            </Box>
+          )}
+          {a.note !== '' && (
+            <Box paddingLeft={3}>
+              <Text color="error" wrap="wrap">
+                {a.note}
+              </Text>
+            </Box>
+          )}
+        </Box>
+      ))
+      return [head, ...lines]
+    })
+
     return (
-      <Box flexDirection="row">
-        <Text dimColor={!e.props.isRunning} wrap="truncate-end">
-          {actionLine(summary)}
-        </Text>
-        {e.props.isRunning && <Text color="claude">{' …'}</Text>}
-        {outcome && <Text color="error">{` · ${outcome}`}</Text>}
+      <Box flexDirection="column">
+        <Box flexDirection="row" justifyContent="space-between">
+          <Box flexDirection="row" flexShrink={1}>
+            <Text bold color="claude" wrap="truncate-end">
+              {c.title}
+            </Text>
+            <Text dimColor>{`  ${summary}`}</Text>
+          </Box>
+          {rawButton}
+        </Box>
+        {groups}
       </Box>
     )
   })
 
+  // Tool rows in the transcript: hidden while Clean View is on, unless the
+  // Details pane asked for them back.
+  on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
+    if (await read($, showsToolRowsAtom)) return next(e)
+    const { Box } = $.ui.resolve(e)
+    return <Box />
+  })
+
   on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
-    const mode = await read($, modeAtom)
-    if (mode === 'full') return next(e)
+    if (await read($, showsToolRowsAtom)) return next(e)
     const { Box } = $.ui.resolve(e)
     return <Box />
   })
 
   on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
-    const mode = await read($, modeAtom)
-    if (mode === 'full') return next(e)
-    const { Box, Text } = $.ui.resolve(e)
-    if (mode === 'simple') return <Box />
-    const lines = e.props.calls
-      .map((call, i) => ({ i, call, summary: describeAction(call.tool, call.input, OWN_PREFIX) }))
-      .filter(one => one.summary !== null)
-    return (
-      <Box flexDirection="column">
-        {lines.map(({ i, call, summary }) => (
-          <Box key={`call-${call.tool_use_id ?? i}`} flexDirection="row">
-            <Text dimColor={!call.isRunning} wrap="truncate-end">
-              {actionLine(summary!)}
-            </Text>
-            {call.isErrored && <Text color="error">{" · didn't work"}</Text>}
-          </Box>
-        ))}
-      </Box>
-    )
+    if (await read($, showsToolRowsAtom)) return next(e)
+    const { Box } = $.ui.resolve(e)
+    return <Box />
   })
 
   on('ui.render', { component: 'ToolProgress' }, async ($, e, next) => {
-    const mode = await read($, modeAtom)
-    if (mode === 'full') return next(e)
+    if (await read($, showsToolRowsAtom)) return next(e)
     return next({ ...e, props: { ...e.props, hint: '' } })
   })
 }
-

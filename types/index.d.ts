@@ -1,4 +1,4 @@
-/** The view the person picked for Clean View: Simple hides tool rows, Guided shows one line each. */
+/** The view the person picked for Clean View: Simple shows the checklist alone, Guided adds the latest action. */
 export type CleanViewStyle = 'simple' | 'guided'
 
 /** The view in force: the picked style, or `full` while Clean View is switched off. */
@@ -16,25 +16,21 @@ export type ChecklistTask = {
 
 export type ChecklistPhase = 'idle' | 'working' | 'needsYou' | 'stuck' | 'stopped' | 'done'
 
-export type ActionKind =
-  | 'skill'
-  | 'website'
-  | 'search'
-  | 'connector'
-  | 'agent'
-  | 'command'
-  | 'file'
-  | 'question'
-  | 'tool'
-
-/** One thing Claude did behind the scenes, as the technical layer shows it. */
+/** One thing Claude or a helper agent did, for the trail and the Details pane. */
 export type ChecklistAction = {
   id: string
-  kind: ActionKind
   icon: string
   label: string
   detail: string
   isFailed: boolean
+  /** The whole thing for the Details pane: the full command, path, address or query. */
+  full: string
+  /** The checklist step that was active when it ran. */
+  step: string
+  /** True when a helper agent did it, not Claude itself. */
+  isHelper: boolean
+  /** The first line of what went wrong, for a failed action. */
+  note: string
 }
 
 export type Checklist = {
@@ -50,8 +46,15 @@ export type Checklist = {
   hasRealPlan: boolean
   /** Increases with every new job, so late answers for an old job are ignored. */
   jobId: number
-  /** The most recent actions, newest last. */
+  /** The job's actions, newest last, up to the last 300. */
   actions: ChecklistAction[]
+}
+
+/** What the toolbox shows: the model and effort the session runs with. */
+export type ToolboxInfo = {
+  model: string
+  /** The effort the last request used, or the saved setting; null before either is known. */
+  effort: string | null
 }
 
 declare module 'claude-code' {
@@ -63,6 +66,11 @@ declare module 'claude-code' {
       modSettings: Record<string, string>
       checklist: Checklist
       tick: number
+      /** True while the Details pane has asked for the engine's own tool rows in the transcript. */
+      cleanViewRaw: boolean
+      /** Whether the toolbox panel above the prompt is open. */
+      toolboxOpen: boolean
+      toolboxInfo: ToolboxInfo
     }
   }
 }

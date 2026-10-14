@@ -2,6 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+import { meterCells } from '../hooks/clean-view/clean-view'
 import { cleanName, describeAction } from '../hooks/clean-view/text'
 
 const PREFIX = 'mcp__rhazi3l-mods__'
@@ -19,6 +20,33 @@ const BAND = {
     maxRows: 20,
     bodyColumns: 90,
     scroll: { offset: 0, bodyRows: 19 },
+    view: {},
+  },
+} as const
+
+const ROW = {
+  plugin: 'rhazi3l-mods',
+  component: 'ToolUse',
+  props: {
+    tool_use_id: 'tu1',
+    tool: 'WebFetch',
+    input: { url: 'https://wiki.hyprland.org/Configuring/Variables/' },
+    isRunning: false,
+    isErrored: false,
+    isInterrupted: false,
+  },
+} as const
+
+const PANE = {
+  plugin: 'rhazi3l-mods',
+  component: 'Pane',
+  requestId: 'clean-view-details',
+  props: {
+    title: 'What Claude did',
+    isFocused: false,
+    bodyColumns: 90,
+    placement: 'inline',
+    scroll: { offset: 0, bodyRows: 40 },
     view: {},
   },
 } as const
@@ -45,7 +73,7 @@ async function startSession($: Engine, on: On) {
 /** A session with one job running. */
 async function startJob($: Engine, on: On) {
   await startSession($, on)
-  await $.prompt.submit({ text: 'Build my landing page', wait: false })
+  await $.prompt.submit({ text: 'Build my landing page', wait: false, origin: RUN.origin })
   await $.turn.start({ text: 'Build my landing page', turnId: 't1' })
 }
 
@@ -76,6 +104,14 @@ describe('plain names', () => {
 })
 
 describe('checklist', () => {
+  test('step bars light a share, all of a done step and none of an upcoming one', async () => {
+    const task = { id: 't', name: 'Build', status: 'active' as const, percent: 60, hasReported: true }
+    expect(meterCells(task, 0).filter(Boolean)).toHaveLength(6)
+    expect(meterCells({ ...task, status: 'done' }, 0).every(Boolean)).toBe(true)
+    expect(meterCells({ ...task, status: 'upcoming' }, 0).some(Boolean)).toBe(false)
+  })
+
+
   test('a to-do list plus a 60% report draws done, 60%, Next and Up next', async ($, on) => {
     await startJob($, on)
     await $.tool.call({
@@ -97,9 +133,24 @@ describe('checklist', () => {
       expect(await ui.find({ type: 'Text', text: 'Up next' })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /▶/ })).toBeDefined()
       expect(await ui.find({ key: 'clean-view-style' })).toBeDefined()
-      expect(await ui.find({ key: 'mod-clean-view' })).toBeDefined()
+      expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'round', borderColor: 'claude' } })
+      expect(await ui.find({ key: 'clean-view-overall' })).toMatchObject({ text: expect.stringMatching(/Step 2 of 4 ━+ +40%/) })
+      expect(await ui.find({ type: 'Text', text: /^━{6}$/ })).toMatchObject({ props: { color: 'claude' } })
+      expect(await ui.find({ type: 'Text', text: /^━{4}$/ })).toMatchObject({ props: { color: 'subtle' } })
       await ui.unmount()
     }
+  })
+
+  test('a finished job keeps its time at the right, outside the title', async ($, on) => {
+    await startJob($, on)
+    await $.tool.call({ tool: PLAN, steps: ['Read your notes'] } as never)
+    await $.tool.call({ tool: PROGRESS, task: 'Read your notes', percent: 100 } as never)
+    await $.turn.complete({ turnId: 't1', answer: 'Done.', reason: 'end_turn' } as never)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await ui.find({ type: 'Text', text: /^✓ All done · / })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^took / })).toBeDefined()
+    expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: 'success' } })
+    await ui.unmount()
   })
 
   test('a permission prompt shows Needs you', async ($, on) => {
@@ -134,42 +185,86 @@ describe('checklist', () => {
     expect(after.isError).toBeUndefined()
   })
 
-  test('Guided shows one plain line for a tool row, Simple hides it', async ($, on) => {
+  test('tool rows stay out of the transcript in Guided and Simple', async ($, on) => {
+    on('ui.render', { component: 'ToolUse' }, ($, e) => {
+      const { Text } = $.ui.resolve(e)
+      return <Text>engine row</Text>
+    })
     await startJob($, on)
-    const row = {
-      plugin: 'rhazi3l-mods',
-      component: 'ToolUse',
-      props: {
-        tool_use_id: 'tu1',
-        tool: 'WebFetch',
-        input: { url: 'https://wiki.hyprland.org/Configuring/Variables/' },
-        isRunning: false,
-        isErrored: false,
-        isInterrupted: false,
-      },
-    } as const
+    for (const style of ['guided', 'simple']) {
+      await $.command.run({ command: 'view', args: style, ...RUN })
+      for (const surface of SURFACES) {
+        const ui = await $.ui.mount({ ...ROW, surface })
+        expect(await ui.find({ type: 'Text' })).toBeUndefined()
+        await ui.unmount()
+      }
+    }
+  })
+
+  test('Guided shows the latest action under the step in progress', async ($, on) => {
+    await startJob($, on)
+    await $.tool.call({ tool: PLAN, steps: ['Read your notes', 'Write the page'] } as never)
+    await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/brand.md' })
+    await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/colours.md' })
     for (const surface of SURFACES) {
-      const ui = await $.ui.mount({ ...row, surface })
-      expect(await ui.find({ type: 'Text', text: /Read a website · wiki\.hyprland\.org/ })).toBeDefined()
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect(await ui.find({ key: 'clean-view-trail' })).toMatchObject({ text: expect.stringMatching(/↳ 📄 colours\.md · 2 actions/) })
+      expect(await ui.find({ key: 'clean-view-details' })).toBeDefined()
       await ui.unmount()
     }
     await $.command.run({ command: 'view', args: 'simple', ...RUN })
-    const hidden = await $.ui.mount({ ...row, surface: 'terminal' })
-    expect(await hidden.find({ type: 'Text' })).toBeUndefined()
-    await hidden.unmount()
+    const simple = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await simple.find({ key: 'clean-view-trail' })).toBeUndefined()
+    await simple.unmount()
+  })
+
+  test('Details lists every step and action in full, and can bring the tool rows back', async ($, on) => {
+    on('ui.open', () => ({ value: { isPlaced: true } }))
+    on('tool.call', { tool: 'Bash' }, () => ({ result: 'failed', isError: true, text: 'bash: hugo: command not found\nmore' }) as never)
+    on('ui.render', { component: 'ToolUse' }, ($, e) => {
+      const { Text } = $.ui.resolve(e)
+      return <Text>engine row</Text>
+    })
+    await startJob($, on)
+    await $.tool.call({ tool: PLAN, steps: ['Read your notes', 'Build the site'] } as never)
+    await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/brand.md' })
+    await $.tool.call({ tool: PROGRESS, task: 'Read your notes', percent: 100 } as never)
+    await $.tool.call({ tool: 'Bash', command: 'hugo build --minify', description: 'Build the site' })
+
+    for (const surface of SURFACES) {
+      const pane = await $.ui.mount({ ...PANE, surface })
+      expect(await pane.find({ type: 'Text', text: 'Read your notes' })).toBeDefined()
+      expect(await pane.find({ type: 'Text', text: '/tmp/notes/brand.md' })).toBeDefined()
+      expect(await pane.find({ type: 'Text', text: 'hugo build --minify' })).toBeDefined()
+      expect(await pane.find({ type: 'Text', text: 'bash: hugo: command not found' })).toMatchObject({ props: { color: 'error' } })
+      expect(await pane.find({ type: 'Text', text: /2 actions · 1 didn't work/ })).toBeDefined()
+      await pane.unmount()
+    }
+
+    const opened = await $.command.run({ command: 'view', args: 'details', ...RUN })
+    expect(opened.text).toContain('Details open')
+
+    const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    await pane.press({ key: 'clean-view-raw' })
+    const row = await $.ui.mount({ ...ROW, surface: 'terminal' })
+    expect(await row.find({ type: 'Text', text: 'engine row' })).toBeDefined()
+    expect(await pane.find({ key: 'clean-view-raw' })).toMatchObject({ text: 'Hide tool output' })
+    await row.unmount()
+    await pane.unmount()
   })
 })
 
-describe('mods row', () => {
-  test('the Mods row shows while idle, and its button turns Clean View off and on', async ($, on) => {
+describe('mods in the toolbox', () => {
+  test('the toolbox shows while idle, and its button turns Clean View off and on', async ($, on) => {
     await startSession($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await ui.find({ key: 'mod-clean-view' })).toMatchObject({ text: '● Clean View' })
       await ui.unmount()
     }
 
-    await $.prompt.submit({ text: 'Build my landing page', wait: false })
+    await $.prompt.submit({ text: 'Build my landing page', wait: false, origin: RUN.origin })
     await $.turn.start({ text: 'Build my landing page', turnId: 't1' })
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await ui.find({ type: 'Text', text: /Understand your request/ })).toBeDefined()
@@ -187,6 +282,7 @@ describe('mods row', () => {
 
   test('/view off hides the checklist and /mods lists the mods', async ($, on) => {
     await startJob($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
     await $.command.run({ command: 'view', args: 'off', ...RUN })
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await ui.find({ type: 'Text', text: /Understand your request/ })).toBeUndefined()
