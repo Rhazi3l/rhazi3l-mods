@@ -616,11 +616,8 @@ export const register: Register = on => {
     )
     if (c.phase === 'needsYou') {
       header = (
-        <Text wrap="truncate-end">
-          <Text backgroundColor={PASTEL.waiting} color="inverseText" bold>
-            {' Needs you '}
-          </Text>
-          {` ${c.needsYouReason ?? REASON_REPLY}`}
+        <Text color={PASTEL.waiting} wrap="truncate-end">
+          {`? Needs you · ${c.needsYouReason ?? REASON_REPLY}`}
         </Text>
       )
     } else if (c.phase === 'stuck') {
@@ -630,7 +627,11 @@ export const register: Register = on => {
         </Text>
       )
     } else if (c.phase === 'stopped') {
-      header = <Text wrap="truncate-end">{`■ Stopped · ${c.title} · you pressed Esc`}</Text>
+      header = (
+        <Text color={PASTEL.stuck} wrap="truncate-end">
+          {`■ Stopped · ${c.title} · you pressed Esc`}
+        </Text>
+      )
     } else if (c.phase === 'done') {
       header = (
         <Text color={PASTEL.done} wrap="truncate-end">
@@ -799,12 +800,7 @@ export const register: Register = on => {
         {frame(
           'state-waiting',
           PASTEL.waiting,
-          <Text wrap="wrap">
-            <Text backgroundColor={PASTEL.waiting} color="inverseText" bold>
-              {' Needs you '}
-            </Text>
-            {' Claude is waiting for your reply'}
-          </Text>,
+          <Text color={PASTEL.waiting} wrap="wrap">{'? Needs you · Claude is waiting for your reply'}</Text>,
           'Blue: Claude asked you something, or needs an OK, and is waiting.',
         )}
         {frame(

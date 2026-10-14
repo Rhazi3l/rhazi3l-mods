@@ -356,6 +356,28 @@ describe('frame colours', () => {
     }
   })
 
+  test('every frame colour has its own icon, in plain coloured text with no background chip', async ($, on) => {
+    on('ui.open', () => ({ value: { isPlaced: true } }))
+    await startJob($, on)
+    for (const surface of SURFACES) {
+      const pane = await $.ui.mount({ ...LEGEND, surface })
+      const icons: [string, RegExp, string][] = [
+        ['state-working', /^✱ /, PASTEL.working],
+        ['state-waiting', /^\? /, PASTEL.waiting],
+        ['state-stuck', /^⚠ /, PASTEL.stuck],
+        ['state-done', /^✓ /, PASTEL.done],
+        ['state-stopped', /^■ /, PASTEL.stuck],
+      ]
+      for (const [key, icon, colour] of icons) {
+        const frame = await pane.find({ key })
+        expect(frame?.text).toMatch(icon)
+        expect(JSON.stringify(frame)).toContain(`"color":"${colour}"`)
+        expect(JSON.stringify(frame)).not.toContain('backgroundColor')
+      }
+      await pane.unmount()
+    }
+  })
+
   test('the checklist frame uses the same pastel for each state', async ($, on) => {
     await startJob($, on)
     const working = await $.ui.mount({ ...BAND, surface: 'desktop' })
@@ -364,7 +386,8 @@ describe('frame colours', () => {
     await $.turn.complete({ turnId: 't1', answer: 'Which one do you want?', reason: 'answer' } as never)
     const waiting = await $.ui.mount({ ...BAND, surface: 'desktop' })
     expect(await waiting.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.waiting } })
-    expect(await waiting.find({ type: 'Text', text: /^ Needs you $/ })).toMatchObject({ props: { backgroundColor: PASTEL.waiting } })
+    expect(await waiting.find({ type: 'Text', text: /^\? Needs you · / })).toMatchObject({ props: { color: PASTEL.waiting } })
+    expect(JSON.stringify(await waiting.find({ key: 'clean-view-header' }))).not.toContain('backgroundColor')
     await waiting.unmount()
   })
 })
