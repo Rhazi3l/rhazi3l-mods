@@ -606,7 +606,7 @@ export const register: Register = on => {
     if (c.phase === 'needsYou') {
       header = (
         <Text wrap="truncate-end">
-          <Text backgroundColor="warning" color="inverseText" bold>
+          <Text backgroundColor="permission" color="inverseText" bold>
             {' Needs you '}
           </Text>
           {` ${c.needsYouReason ?? REASON_REPLY}`}
@@ -667,7 +667,15 @@ export const register: Register = on => {
     // The frame keeps the checklist apart from the reply; its colour says how the job stands.
     // A job waiting on the person gets a heavier border, so it stands out from one still working.
     const frameColor =
-      c.phase === 'done' ? 'success' : c.phase === 'needsYou' || c.phase === 'stuck' ? 'warning' : c.phase === 'stopped' ? 'inactive' : 'claude'
+      c.phase === 'done'
+        ? 'success'
+        : c.phase === 'needsYou'
+          ? 'permission' // the blue Claude Code uses for its own "needs your answer" dialogs, apart from the orange of a job in progress
+          : c.phase === 'stuck'
+            ? 'warning'
+            : c.phase === 'stopped'
+              ? 'inactive'
+              : 'claude'
     const frame = (children: RenderChildren) => (
       <Box key="clean-view-frame" flexDirection="column" borderStyle={c.phase === 'needsYou' ? 'bold' : 'round'} borderColor={frameColor} paddingX={1}>
         {children}
