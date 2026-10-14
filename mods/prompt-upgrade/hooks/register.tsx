@@ -118,9 +118,13 @@ export const register: Register = on => {
     const rest = await next(e)
     if (!(await read($, isOnAtom))) return rest
     const { Box, Text, Button } = $.ui.resolve(e)
+    // The footer has little room beside the Toolbox button, and the desktop app clips what
+    // does not fit at the right, which hid the Toolbox. Off the terminal the label is dropped
+    // and the star stands alone; the Toolbox's Mods row names it in full.
+    const isTerminal = e.surface === 'terminal'
     return (
       <Box flexDirection="row">
-        <Box key="pu-footer" marginRight={2}>
+        <Box key="pu-footer" marginRight={isTerminal ? 2 : 1} flexShrink={0}>
           <Button
             key="pu-upgrade"
             plain
@@ -134,8 +138,8 @@ export const register: Register = on => {
               }
             }}
           >
-            <Text color="claude">{'✦ '}</Text>
-            <Text>Upgrade prompt</Text>
+            <Text color="claude">{isTerminal ? '✦ ' : '✦'}</Text>
+            {isTerminal && <Text>Upgrade prompt</Text>}
           </Button>
         </Box>
         {rest}

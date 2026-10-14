@@ -186,6 +186,22 @@ describe('the /better flow', () => {
   })
 })
 
+describe('the footer button on each surface', () => {
+  test('the terminal names it; elsewhere the star stands alone so the Toolbox keeps its room', async ($, on) => {
+    await startSession($, on)
+    const term = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
+    expect(await term.find({ key: 'pu-upgrade' })).toMatchObject({ text: expect.stringContaining('Upgrade prompt') })
+    await term.unmount()
+    const desk = await $.ui.mount({ ...FOOTER, surface: 'desktop' })
+    const button = await desk.find({ key: 'pu-upgrade' })
+    expect(button).toBeDefined()
+    expect(button?.text).not.toContain('Upgrade prompt')
+    expect(button?.text).toContain('✦')
+    expect(await desk.find({ key: 'pu-footer' })).toMatchObject({ props: { flexShrink: 0 } })
+    await desk.unmount()
+  })
+})
+
 describe('the Upgrade prompt button', () => {
   test('it sits in the prompt footer on both surfaces, and pressing it upgrades what is typed', async ($, on) => {
     const seen = await startSession($, on)

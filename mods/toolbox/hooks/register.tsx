@@ -149,17 +149,19 @@ export const register: Register = on => {
       <Box flexDirection="row">
         {modes !== '' && <Text dimColor>{`${modes}  `}</Text>}
         {others}
-        <Button
-          key="toolbox"
-          plain
-          onPress={() => update($, toolboxOpenAtom, open => !open)}
-        >
-          <Text color="claude">{'◆ '}</Text>
-          <Text color={isOpen ? 'claude' : 'text'} bold={isOpen}>
-            Toolbox
-          </Text>
-          <Text color={isOpen ? 'claude' : 'inactive'}>{isOpen ? ' ▴' : ' ▾'}</Text>
-        </Button>
+        <Box key="toolbox-footer" flexShrink={0}>
+          <Button
+            key="toolbox"
+            plain
+            onPress={() => update($, toolboxOpenAtom, open => !open)}
+          >
+            <Text color="claude">{'◆ '}</Text>
+            <Text color={isOpen ? 'claude' : 'text'} bold={isOpen}>
+              Toolbox
+            </Text>
+            <Text color={isOpen ? 'claude' : 'inactive'}>{isOpen ? ' ▴' : ' ▾'}</Text>
+          </Button>
+        </Box>
       </Box>
     )
   })
