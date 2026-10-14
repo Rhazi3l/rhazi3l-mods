@@ -348,7 +348,7 @@ describe('frame colours', () => {
       expect(await pane.find({ key: 'state-waiting' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.waiting } })
       expect(await pane.find({ key: 'state-stuck' })).toMatchObject({ props: { borderColor: PASTEL.stuck } })
       expect(await pane.find({ key: 'state-done' })).toMatchObject({ props: { borderColor: PASTEL.done } })
-      expect(await pane.find({ key: 'state-stopped' })).toMatchObject({ props: { borderColor: PASTEL.stopped } })
+      expect(await pane.find({ key: 'state-stopped' })).toMatchObject({ props: { borderColor: PASTEL.stuck } })
       expect(await pane.find({ type: 'Text', text: /^Blue: Claude asked you something/ })).toBeDefined()
       expect(await pane.find({ type: 'Text', text: /^Yellow: a step keeps failing/ })).toBeDefined()
       expect(await pane.find({ type: 'Button' })).toBeUndefined()

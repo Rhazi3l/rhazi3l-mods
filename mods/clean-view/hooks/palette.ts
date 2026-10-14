@@ -12,11 +12,11 @@ export const PASTEL = {
   working: '#d4743c',
   /** Waiting for the person's reply. A clear blue. */
   waiting: '#73a5de',
-  /** Stuck, or a warning. A warm yellow. */
+  /** Stuck or stopped, or a warning: a problem to look at. A warm yellow. */
   stuck: '#f1ce7e',
   /** Done, and on in a switch. A fresh green. */
   done: '#9dcb86',
-  /** Stopped, off, and the original beside an upgrade. A neutral grey. */
+  /** Off, and the original beside an upgrade. A neutral grey. */
   stopped: '#787d87',
   /** Something went wrong. A coral red. */
   error: '#e67a85',

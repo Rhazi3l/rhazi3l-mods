@@ -684,7 +684,7 @@ export const register: Register = on => {
           : c.phase === 'stuck'
             ? PASTEL.stuck
             : c.phase === 'stopped'
-              ? PASTEL.stopped
+              ? PASTEL.stuck // stuck and stopped are both a problem to look at, so they share yellow
               : PASTEL.working
     const frame = (children: RenderChildren) => (
       <Box key="clean-view-frame" flexDirection="column" borderStyle="round" borderColor={frameColor} paddingX={1}>
@@ -821,9 +821,9 @@ export const register: Register = on => {
         )}
         {frame(
           'state-stopped',
-          PASTEL.stopped,
-          <Text wrap="wrap">{'■ Stopped · you pressed Esc'}</Text>,
-          'Grey: you interrupted the job.',
+          PASTEL.stuck,
+          <Text color={PASTEL.stuck} wrap="wrap">{'■ Stopped · you pressed Esc'}</Text>,
+          'Yellow: you interrupted the job.',
         )}
       </Box>
     )
