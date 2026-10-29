@@ -58,8 +58,6 @@ declare module 'claude-code' {
       isOn: boolean
       checklist: Checklist
       tick: number
-      /** True while the Details pane has asked for the engine's own tool rows in the transcript. */
-      showsRaw: boolean
     }
   }
 }

@@ -73,13 +73,12 @@ const COLOURS_PANE = 'clean-view-colours'
 const isOnAtom = atom({ plugin: 'clean-view', key: 'isOn' } as const, true)
 const checklistAtom = atom({ plugin: 'clean-view', key: 'checklist' } as const, EMPTY)
 const tickAtom = atom({ plugin: 'clean-view', key: 'tick' } as const, 0)
-const rawAtom = atom({ plugin: 'clean-view', key: 'showsRaw' } as const, false)
 
 /** The view in force: guided, or `full` while Clean View is off. */
 const modeAtom = derive([isOnAtom], (isOn): ViewMode => (isOn ? 'guided' : 'full'))
 
-/** Whether the transcript shows the engine's own tool rows: Clean View off, or Details asked for them. */
-const showsToolRowsAtom = derive([modeAtom, rawAtom], (mode, raw) => mode === 'full' || raw)
+/** Whether the transcript shows the engine's own tool rows: only while Clean View is off. */
+const showsToolRowsAtom = derive([modeAtom], mode => mode === 'full')
 
 const PROMPT_SECTION = `# Clean View checklist
 The person sees a plain-English checklist of your work instead of tool output.
@@ -304,12 +303,6 @@ export function barSvg(cells: boolean[], litColor: string): string {
 
 // ---------- Hooks ----------
 
-/** Opening Details also brings back every tool row and its output in the transcript, until the next job. */
-async function openDetails($: EngineInterface) {
-  await update($, rawAtom, () => true)
-  return $.ui.open({ id: DETAILS_PANE, title: DETAILS_TITLE })
-}
-
 /**
  * A /clear starts the session's values over and fires no session.start, so Clean View's on/off (which the
  * toolbox reads to show its button) is written again from what was saved.
@@ -338,7 +331,7 @@ export const register: Register = on => {
   on('command.run', { command: 'view' }, async ($, e) => {
     const arg = e.args.trim().toLowerCase()
     if (arg === 'details') {
-      const opened = await openDetails($)
+      const opened = await $.ui.open({ id: DETAILS_PANE, title: DETAILS_TITLE })
       return {
         text: opened.isPlaced
           ? 'Details open: every step and action of this job.'
@@ -406,7 +399,6 @@ export const register: Register = on => {
         tasks: placeholderTasks(),
         startedAt: now,
       }))
-      await update($, rawAtom, () => false)
       if (mode !== 'full') {
         const text = e.text
         const jobId = written.jobId
@@ -629,7 +621,7 @@ export const register: Register = on => {
           key="clean-view-details"
           label="Details"
           hotkey="d"
-          onPress={() => openDetails($)}
+          onPress={() => $.ui.open({ id: DETAILS_PANE, title: DETAILS_TITLE })}
         />
       </Box>
     )
