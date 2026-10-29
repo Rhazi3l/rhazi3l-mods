@@ -9,7 +9,7 @@ import { atom, derive, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
 
 import type { Checklist, ChecklistAction, ChecklistTask, ViewMode } from '../types'
-import { COMMANDS, TOOLS } from './info'
+import { COMMANDS } from './info'
 import { PASTEL } from './palette'
 import {
   apiErrorSentence,
@@ -27,10 +27,7 @@ import {
 } from './text'
 
 const OWN_PREFIX = 'mcp__clean-view__'
-const PLAN_TOOL = 'mcp__clean-view__plan_steps'
-const PROGRESS_TOOL = 'mcp__clean-view__report_progress'
-
-const ALWAYS_ALLOWED = new Set(['ToolSearch', 'TodoWrite', 'TaskCreate', 'TaskUpdate', 'AskUserQuestion'])
+const DEFAULT_TITLE = 'Working on your request'
 const METER = 10
 /** How many steps the checklist shows at once; the rest are summed up in one line. */
 export const MAX_VISIBLE_STEPS = 3
@@ -81,15 +78,11 @@ const modeAtom = derive([isOnAtom], (isOn): ViewMode => (isOn ? 'guided' : 'full
 /** Whether the transcript shows the engine's own tool rows: only while Clean View is off. */
 const showsToolRowsAtom = derive([modeAtom], mode => mode === 'full')
 
-const PROMPT_SECTION = `# Clean View checklist
-The person sees a plain-English checklist of your work instead of tool output.
-- For every request, even a quick question, call ${PLAN_TOOL} first with every step of the job in order (2 to 8 steps). If it is deferred, load it with ToolSearch first. If this session has TodoWrite or TaskCreate, your to-do list can serve as the plan instead.
-- Then call ${PROGRESS_TOOL} as real progress happens, and with percent 100 the moment a step finishes.
-- Before your final answer, call ${PROGRESS_TOOL} with percent 100 for every step still open, so the checklist ends complete.
-- Write every step name in plain English a non-technical person understands, under 40 characters, starting with a verb, like "Build the pricing section".
-- Never put file paths, file names, commands, code or tool names in a step name.`
-
-const GATE_TEXT = `Clean View: call ${PLAN_TOOL} first to lay out the steps of this job (2 to 8 short plain-English names), then try again. A TodoWrite or TaskCreate to-do list also counts as the plan.`
+const PROMPT_SECTION = `# Clean View
+The person sees your to-do list as a plain-English checklist; tool output is hidden.
+- For work of two or more steps, start with a TodoWrite or TaskCreate list and keep it current, marking each step completed as soon as it is done. Skip the list for a quick question.
+- Write every step name in plain English, under 40 characters, starting with a verb, like "Build the pricing section". No file paths, file names, commands, code or tool names.
+- Answer first, in as few words as possible. Do not narrate steps or repeat results the person can open in Details. End with a short plain-English summary of what changed and anything they must decide.`
 
 // Module state: rebuilt on every reload (session.start fires again then).
 let ticker: Timer | undefined
@@ -99,7 +92,6 @@ let lastApiError: { kind?: string; details?: string } | undefined
 let idCounter = 0
 
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${(idCounter++).toString(36)}`
-const clampPercent = (n: unknown) => Math.max(0, Math.min(100, Math.round(Number(n) || 0)))
 const isRunningPhase = (c: Checklist) => c.phase === 'working' || c.phase === 'needsYou' || c.phase === 'stuck'
 const hasUnfinished = (c: Checklist) => c.tasks.some(t => t.status !== 'done')
 
@@ -118,44 +110,8 @@ function startFirstUpcoming(tasks: ChecklistTask[]): ChecklistTask[] {
   return i < 0 ? tasks : tasks.map((t, j) => (j === i ? { ...t, status: 'active', percent: 0 } : t))
 }
 
-function applyPlan(c: Checklist, steps: readonly string[]): Checklist {
-  const tasks = steps.slice(0, 8).map<ChecklistTask>((name, i) => ({
-    id: newId('s'),
-    name: cleanName(name),
-    status: i === 0 ? 'active' : 'upcoming',
-    percent: 0,
-    hasReported: false,
-  }))
-  return { ...c, tasks, hasRealPlan: true }
-}
-
-function applyProgress(c: Checklist, rawName: string, rawPercent: unknown): Checklist {
-  const name = cleanName(rawName)
-  const percent = clampPercent(rawPercent)
-  let tasks = c.hasRealPlan ? c.tasks.map(t => ({ ...t })) : []
-  let i = tasks.findIndex(t => t.name.toLowerCase() === name.toLowerCase())
-
-  if (i < 0) {
-    const active = tasks.findIndex(t => t.status === 'active')
-    const lastDone = tasks.map(t => t.status).lastIndexOf('done')
-    i = active >= 0 ? active + 1 : lastDone + 1
-    tasks.splice(i, 0, { id: newId('s'), name, status: 'upcoming', percent: 0, hasReported: false })
-  }
-
-  tasks = tasks.map((t, j) => {
-    if (j < i) return { ...t, status: 'done', percent: 100 }
-    if (j === i) return { ...t, status: 'active', percent, hasReported: true }
-    return t.status === 'done' ? t : { ...t, status: 'upcoming', percent: 0 }
-  })
-
-  if (percent >= 100) {
-    const next = tasks.findIndex((t, j) => j > i && t.status !== 'done')
-    tasks = tasks.map((t, j) =>
-      j === i ? { ...t, status: 'done', percent: 100 } : j === next ? { ...t, status: 'active', percent: 0, hasReported: false } : t,
-    )
-  }
-  return { ...c, tasks }
-}
+/** The header names the job after its first step once a plan arrives, until then it keeps the placeholder. */
+const titleFor = (c: Checklist, tasks: readonly ChecklistTask[]) => (c.title === DEFAULT_TITLE && tasks[0] ? tasks[0].name : c.title)
 
 type Todo = { content: string; status: 'pending' | 'in_progress' | 'completed' }
 
@@ -172,7 +128,7 @@ function applyTodos(c: Checklist, todos: readonly Todo[]): Checklist {
       hasReported: Boolean(keepsPercent),
     }
   })
-  return { ...c, tasks, hasRealPlan: tasks.length > 0 || c.hasRealPlan }
+  return { ...c, tasks, title: titleFor(c, tasks), hasRealPlan: tasks.length > 0 || c.hasRealPlan }
 }
 
 /** Whether the last paragraph of an answer ends in a question, the sign Claude is waiting for the person. */
@@ -200,13 +156,6 @@ const shouldTick = (c: Checklist, mode: ViewMode) => mode !== 'full' && (c.phase
 function stopTicker() {
   ticker?.cancel()
   ticker = undefined
-}
-
-const NAME_SYSTEM =
-  'Name the job described in the request in 2 to 6 plain English words, starting with a verb, like "Build my landing page". No file names, code or punctuation. Answer with the name only.'
-
-function jobTitleFrom(answer: string): string {
-  return cleanName((answer.split('\n')[0] ?? '').replace(/^["'\s]+|["'.\s]+$/g, ''))
 }
 
 function recordAction(c: Checklist, action: ChecklistAction): Checklist {
@@ -325,7 +274,6 @@ export const register: Register = on => {
     // Written even when unchanged, so other mods can tell Clean View is installed.
     await update($, isOnAtom, () => (typeof savedOn === 'boolean' ? savedOn : true))
     try {
-      for (const tool of TOOLS) await $.tool.register(tool)
       for (const command of COMMANDS) await $.command.register(command)
     } catch {
       // Not bound (a headless host): Clean View still follows what it can.
@@ -399,25 +347,11 @@ export const register: Register = on => {
       const written = await update($, checklistAtom, (c): Checklist => ({
         ...EMPTY,
         jobId: c.jobId + 1,
-        title: 'Working on your request',
+        title: DEFAULT_TITLE,
         phase: 'working',
         tasks: placeholderTasks(),
         startedAt: now,
       }))
-      if (mode !== 'full') {
-        const text = e.text
-        const jobId = written.jobId
-        $.clock.after(0, () => {
-          void $.model
-            .complete({ model: 'haiku', effort: 'low', maxTokens: 30, timeoutMs: 20000, system: NAME_SYSTEM, prompt: text.slice(0, 4000) })
-            .then(answer => {
-              if (!answer.isAnswered) return
-              const title = jobTitleFrom(answer.text)
-              return update($, checklistAtom, c => (c.jobId === jobId ? { ...c, title } : c))
-            })
-            .catch(() => undefined)
-        })
-      }
       if (shouldTick(written, mode) && !ticker) {
         ticker = $.clock.every(TICK_MS, async () => {
           const [list, view] = await Promise.all([read($, checklistAtom), read($, modeAtom)])
@@ -431,27 +365,8 @@ export const register: Register = on => {
     return started
   })
 
-  // The model's two checklist tools.
-  on('tool.call', { tool: 'mcp__clean-view__plan_steps' }, async ($, e) => {
-    const raw = (e as unknown as { steps?: unknown }).steps
-    const steps = Array.isArray(raw) ? raw.map(s => String(s)).filter(s => s.trim() !== '') : []
-    if (steps.length === 0) return { deny: 'plan_steps needs at least one step name.' }
-    if (e.agentId !== undefined) return { result: 'Noted.' }
-    const written = await update($, checklistAtom, c => clearNeedsYou(applyPlan(c, steps)))
-    return { result: `Planned ${written.tasks.length} steps. The first one has started.` }
-  })
-
-  on('tool.call', { tool: 'mcp__clean-view__report_progress' }, async ($, e) => {
-    const args = e as unknown as { task?: unknown; percent?: unknown }
-    const percent = clampPercent(args.percent)
-    if (e.agentId === undefined) {
-      await update($, checklistAtom, c => clearNeedsYou(applyProgress(c, String(args.task ?? ''), percent)))
-    }
-    return { result: `Progress noted: ${percent}%.` }
-  })
-
-  // Every other tool: the plan-first gate, the needs-you and stuck states,
-  // the to-do list as the checklist, and the action trail.
+  // Every tool: the needs-you and stuck states, the to-do list as the
+  // checklist, and the action trail.
   on('tool.call', async ($, e, next) => {
     const tool = String(e.tool)
     if (tool.startsWith(OWN_PREFIX)) return next(e)
@@ -474,12 +389,6 @@ export const register: Register = on => {
       }
       return ran
     }
-
-    const mode = await read($, modeAtom)
-    const before = await read($, checklistAtom)
-    const isGated =
-      mode !== 'full' && isRunningPhase(before) && before.startedAt !== null && !before.hasRealPlan && !ALWAYS_ALLOWED.has(tool)
-    if (isGated) return { deny: GATE_TEXT }
 
     const summary = describeAction(tool, e, OWN_PREFIX)
     const actionId = e.tool_use_id ?? newId('a')
@@ -521,7 +430,8 @@ export const register: Register = on => {
             percent: 0,
             hasReported: false,
           }
-          changed = { ...changed, hasRealPlan: true, tasks: startFirstUpcoming([...base, task]) }
+          const tasks = startFirstUpcoming([...base, task])
+          changed = { ...changed, hasRealPlan: true, tasks, title: titleFor(changed, tasks) }
         }
         if (e.tool === 'TaskUpdate') {
           const id = `task-${e.taskId}`

@@ -7,8 +7,6 @@ import { asksSomething, barSvg, meterCells, stepWindow } from '../hooks/register
 import { cleanName, describeAction, extractQuestion, quickReplies } from '../hooks/text'
 
 const PREFIX = 'mcp__clean-view__'
-const PLAN = 'mcp__clean-view__plan_steps'
-const PROGRESS = 'mcp__clean-view__report_progress'
 const SURFACES = ['terminal', 'desktop'] as const
 const RUN = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
 
@@ -74,6 +72,17 @@ async function startSession($: Engine, on: On) {
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
 }
 
+/** The to-do list the checklist follows: the first `done` steps completed, the next one in progress. */
+const todo = ($: Engine, names: string[], done = 0) =>
+  $.tool.call({
+    tool: 'TodoWrite',
+    todos: names.map((content, i) => ({
+      content,
+      status: i < done ? 'completed' : i === done ? 'in_progress' : 'pending',
+      activeForm: content,
+    })),
+  })
+
 /** A session with one job running. */
 async function startJob($: Engine, on: On) {
   await startSession($, on)
@@ -112,7 +121,7 @@ describe('plain names', () => {
       detail: 'query notes',
     })
     expect(describeAction('SomeNewTool', {}, PREFIX)).toMatchObject({ label: 'Used a tool', detail: 'Some new tool' })
-    expect(describeAction(PLAN, {}, PREFIX)).toBeNull()
+    expect(describeAction(`${PREFIX}anything`, {}, PREFIX)).toBeNull()
     expect(describeAction('TodoWrite', {}, PREFIX)).toBeNull()
   })
 })
@@ -126,23 +135,16 @@ describe('checklist', () => {
   })
 
 
-  test('a to-do list plus a 60% report draws done, 60%, Next and Up next', async ($, on) => {
+  test('a to-do list draws done, Working, Next and Up next', async ($, on) => {
     await startJob($, on)
-    await $.tool.call({
-      tool: 'TodoWrite',
-      todos: [
-        { content: 'Read your brand notes', status: 'completed', activeForm: 'Reading' },
-        { content: 'Build the pricing section', status: 'in_progress', activeForm: 'Building' },
-        { content: 'Add the contact form', status: 'pending', activeForm: 'Adding' },
-        { content: 'Polish the footer', status: 'pending', activeForm: 'Polishing' },
-      ],
-    })
-    await $.tool.call({ tool: PROGRESS, task: 'Build the pricing section', percent: 60 } as never)
+    await todo($, ['Read your brand notes', 'Build the pricing section', 'Add the contact form', 'Polish the footer'], 1)
 
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await ui.find({ type: 'Text', text: /✓/ })).toBeDefined()
-      expect(await ui.find({ type: 'Text', text: '60%' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: 'Working' })).toBeDefined()
+      // No percent is reported, so the header takes its name from the first step.
+      expect(await ui.find({ type: 'Text', text: '✱ Read your brand notes' })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /^Next$/ })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: 'Up next' })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /▶/ })).toBeDefined()
@@ -152,13 +154,12 @@ describe('checklist', () => {
       expect(await ui.find({ key: 'clean-view-overall' })).toBeUndefined()
       expect(await ui.find({ type: 'Text', text: /Step \d/ })).toBeUndefined()
       if (surface === 'terminal') {
-        expect(await ui.find({ type: 'Text', text: /^━{6}$/ })).toMatchObject({ props: { color: PASTEL.working } })
-        expect(await ui.find({ type: 'Text', text: /^━{4}$/ })).toMatchObject({ props: { color: 'subtle' } })
+        const bars = await ui.findAll({ type: 'Text', text: /^━{10}$/ })
+        expect(bars.map(bar => bar.props.color)).toEqual(['subtle', 'subtle', 'subtle'])
       } else {
         // The desktop draws each step's bar as an image, centred in its row, in the same colours.
         expect(await ui.find({ type: 'Text', text: /^━/ })).toBeUndefined()
-        expect(await ui.find({ type: 'Svg' })).toMatchObject({ props: { alt: '60%' } })
-        expect(JSON.stringify(await ui.find({ type: 'Svg' }))).toContain(PASTEL.working)
+        expect(await ui.find({ type: 'Svg' })).toMatchObject({ props: { alt: 'Working' } })
       }
       await ui.unmount()
     }
@@ -166,8 +167,7 @@ describe('checklist', () => {
 
   test('a finished job keeps its time at the right, outside the title', async ($, on) => {
     await startJob($, on)
-    await $.tool.call({ tool: PLAN, steps: ['Read your notes'] } as never)
-    await $.tool.call({ tool: PROGRESS, task: 'Read your notes', percent: 100 } as never)
+    await todo($, ['Read your notes'], 1)
     await $.turn.complete({ turnId: 't1', answer: 'Done.', reason: 'end_turn' } as never)
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await ui.find({ type: 'Text', text: /^✓ All done · / })).toBeDefined()
@@ -185,11 +185,10 @@ describe('checklist', () => {
     await ui.unmount()
   })
 
-  test('plan_steps then report_progress at 100 checks off step one and starts step two', async ($, on) => {
+  test('completing a to-do step checks it off and starts the next', async ($, on) => {
     await startJob($, on)
-    const planned = await $.tool.call({ tool: PLAN, steps: ['Read your notes', 'Build the page', 'Polish it'] } as never)
-    expect(planned.text ?? JSON.stringify(planned.result)).toContain('Planned 3 steps')
-    await $.tool.call({ tool: PROGRESS, task: 'Read your notes', percent: 100 } as never)
+    await todo($, ['Read your notes', 'Build the page', 'Polish it'])
+    await todo($, ['Read your notes', 'Build the page', 'Polish it'], 1)
 
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
     const labels = await ui.findAll({ type: 'Text', text: /^(Done|Working|Next|Up next|\d+%)$/ })
@@ -198,14 +197,11 @@ describe('checklist', () => {
     await ui.unmount()
   })
 
-  test('tools are denied before a plan exists and allowed after', async ($, on) => {
+  test('no tool is held back for a plan', async ($, on) => {
     await startJob($, on)
     const before = await $.tool.call({ tool: 'Read', file_path: '/tmp/a.md' })
-    expect(before.deny ?? before.text ?? '').toContain('plan_steps')
-    await $.tool.call({ tool: PLAN, steps: ['Read your notes'] } as never)
-    const after = await $.tool.call({ tool: 'Read', file_path: '/tmp/a.md' })
-    expect(after.deny).toBeUndefined()
-    expect(after.isError).toBeUndefined()
+    expect(before.deny).toBeUndefined()
+    expect(before.isError).toBeUndefined()
   })
 
   test('tool rows stay out of the transcript', async ($, on) => {
@@ -223,7 +219,7 @@ describe('checklist', () => {
 
   test('the latest action shows on the step in progress', async ($, on) => {
     await startJob($, on)
-    await $.tool.call({ tool: PLAN, steps: ['Read your notes', 'Write the page'] } as never)
+    await todo($, ['Read your notes', 'Write the page'])
     await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/brand.md' })
     await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/colours.md' })
     for (const surface of SURFACES) {
@@ -241,7 +237,7 @@ describe('checklist', () => {
     on('tool.call', { tool: 'Bash' }, () => ({ result: 'ok', text: 'line one\nline two' }) as never)
     on('tool.call', { tool: 'Read' }, () => ({ result: 'ok', text: 'x'.repeat(5000) }) as never)
     await startJob($, on)
-    await $.tool.call({ tool: PLAN, steps: ['Look around'] } as never)
+    await todo($, ['Look around'])
     await $.tool.call({ tool: 'Bash', command: 'ls', description: 'List files' })
     await $.tool.call({ tool: 'Read', file_path: '/tmp/big.txt' })
     const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
@@ -258,9 +254,9 @@ describe('checklist', () => {
       return <Text>engine row</Text>
     })
     await startJob($, on)
-    await $.tool.call({ tool: PLAN, steps: ['Read your notes', 'Build the site'] } as never)
+    await todo($, ['Read your notes', 'Build the site'])
     await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/brand.md' })
-    await $.tool.call({ tool: PROGRESS, task: 'Read your notes', percent: 100 } as never)
+    await todo($, ['Read your notes', 'Build the site'], 1)
     await $.tool.call({ tool: 'Bash', command: 'hugo build --minify', description: 'Build the site' })
 
     for (const surface of SURFACES) {
@@ -314,7 +310,7 @@ describe('replying to a question', () => {
 
   test('the frame shows the question and a button per reply; pressing one sends it as the next message', async ($, on) => {
     await startJob($, on)
-    await $.tool.call({ tool: PLAN, steps: ['Read your notes', 'Report back'] } as never)
+    await todo($, ['Read your notes', 'Report back'])
     await $.turn.complete({ turnId: 't1', answer: OPTIONS, reason: 'answer' } as never)
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
@@ -335,8 +331,7 @@ describe('replying to a question', () => {
 
   test('an answer that asks after every step is done still waits for you, and your reply starts a new job', async ($, on) => {
     await startJob($, on)
-    await $.tool.call({ tool: PLAN, steps: ['Read your notes'] } as never)
-    await $.tool.call({ tool: PROGRESS, task: 'Read your notes', percent: 100 } as never)
+    await todo($, ['Read your notes'], 1)
     await $.turn.complete({ turnId: 't1', answer: 'All done. Want me to push it?', reason: 'answer' } as never)
     const waiting = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await waiting.find({ type: 'Text', text: /Needs you/ })).toBeDefined()
@@ -430,8 +425,7 @@ describe('waiting for you', () => {
 
   test('an answer with a step left open ends done, unless it asks something', async ($, on) => {
     await startJob($, on)
-    await $.tool.call({ tool: PLAN, steps: ['Read your notes', 'Report back'] } as never)
-    await $.tool.call({ tool: PROGRESS, task: 'Read your notes', percent: 100 } as never)
+    await todo($, ['Read your notes', 'Report back'], 1)
     await $.turn.complete({ turnId: 't1', answer: 'The mods are installed.', reason: 'answer' } as never)
     const done = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await done.find({ type: 'Text', text: /^✓ All done · / })).toBeDefined()
@@ -440,7 +434,7 @@ describe('waiting for you', () => {
 
     await $.prompt.submit({ text: 'Another job', wait: false, origin: RUN.origin })
     await $.turn.start({ text: 'Another job', turnId: 't2' })
-    await $.tool.call({ tool: PLAN, steps: ['Look at it', 'Report back'] } as never)
+    await todo($, ['Look at it', 'Report back'])
     await $.turn.complete({ turnId: 't2', answer: 'Which one should I use?', reason: 'answer' } as never)
     const asking = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await asking.find({ type: 'Text', text: /Needs you/ })).toBeDefined()
@@ -488,7 +482,7 @@ describe('on and off', () => {
 describe('layout on each surface', () => {
   test('the terminal sizes columns and the bar to its width; the desktop lets boxes align and buttons wrap', async ($, on) => {
     await startJob($, on)
-    await $.tool.call({ tool: PLAN, steps: ['Read your notes', 'Build the page'] } as never)
+    await todo($, ['Read your notes', 'Build the page'])
 
     const term = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await term.find({ key: 'clean-view-header' })).toMatchObject({ props: { flexWrap: 'nowrap' } })
@@ -534,7 +528,7 @@ describe('the three-step window', () => {
 
   test('a long list draws three rows and one line for the rest', async ($, on) => {
     await startJob($, on)
-    await $.tool.call({ tool: PLAN, steps: ['One', 'Two', 'Three', 'Four', 'Five', 'Six'] } as never)
+    await todo($, ['One', 'Two', 'Three', 'Four', 'Five', 'Six'])
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await ui.find({ type: 'Text', text: /One/ })).toBeDefined()
@@ -543,9 +537,9 @@ describe('the three-step window', () => {
       expect(await ui.find({ type: 'Text', text: '3 more to come' })).toBeDefined()
       await ui.unmount()
     }
-    for (const step of ['One', 'Two']) await $.tool.call({ tool: PROGRESS, task: step, percent: 100 } as never)
+    await todo($, ['One', 'Two', 'Three', 'Four', 'Five', 'Six'], 2)
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await ui.find({ type: 'Text', text: /One|Two/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /^(One|Two)$/ })).toBeUndefined()
     expect(await ui.find({ type: 'Text', text: /Three/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /Five/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /Six/ })).toBeUndefined()
@@ -555,7 +549,7 @@ describe('the three-step window', () => {
 
   test('a short list has no summary line', async ($, on) => {
     await startJob($, on)
-    await $.tool.call({ tool: PLAN, steps: ['One', 'Two', 'Three'] } as never)
+    await todo($, ['One', 'Two', 'Three'])
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await ui.find({ key: 'clean-view-more' })).toBeUndefined()
     await ui.unmount()

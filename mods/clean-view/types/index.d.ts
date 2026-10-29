@@ -45,7 +45,7 @@ export type Checklist = {
   startedAt: number | null
   finishedAt: number | null
   isCollapsed: boolean
-  /** True once Claude has laid out a plan (plan_steps, TodoWrite or TaskCreate). */
+  /** True once Claude has laid out a plan (TodoWrite or TaskCreate). */
   hasRealPlan: boolean
   /** Increases with every new job, so late answers for an old job are ignored. */
   jobId: number
