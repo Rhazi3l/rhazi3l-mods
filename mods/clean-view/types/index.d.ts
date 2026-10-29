@@ -27,6 +27,9 @@ export type ChecklistAction = {
   note: string
   /** What the tool answered, as Claude read it, cut at 4,000 characters; empty until it answers. */
   output: string
+  /** When it started and when it answered (epoch ms); the box shows how long one that is still running has taken. */
+  startedAt?: number
+  endedAt?: number
 }
 
 /** What Claude wrote between tool calls: hidden from the transcript, shown in the box and in Details. */

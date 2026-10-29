@@ -5,6 +5,8 @@ import { DEFAULT_TITLE, REASON_REPLY, STUCK_FAILING } from './state'
 import { cleanName, clipOutput, extractQuestion, quickReplies } from './text'
 
 const MAX_ACTIONS = 300
+/** A running action shows its own clock after this long. */
+const SLOW_AFTER_MS = 5000
 
 let idCounter = 0
 
@@ -148,8 +150,22 @@ export function markFailed(c: Checklist, id: string, note: string): Checklist {
   return { ...c, actions: c.actions.map(a => (a.id === id ? { ...a, isFailed: true, note } : a)) }
 }
 
-export function setOutput(c: Checklist, id: string, output: string): Checklist {
-  return { ...c, actions: c.actions.map(a => (a.id === id ? { ...a, output } : a)) }
+export function setOutput(c: Checklist, id: string, output: string, endedAt: number): Checklist {
+  return { ...c, actions: c.actions.map(a => (a.id === id ? { ...a, output, endedAt } : a)) }
+}
+
+/** The failed actions as plain text to paste: what ran, then what it answered. */
+export function errorReport(c: Checklist): string {
+  return c.actions
+    .filter(a => a.isFailed)
+    .map(a => [`${a.label}${a.full ? `: ${a.full}` : a.detail ? `: ${a.detail}` : ''}`, a.output || a.note].filter(Boolean).join('\n'))
+    .join('\n\n')
+}
+
+/** How long an action that has not answered yet has been running, once it is long enough to notice. */
+export function runningFor(a: ChecklistAction | undefined, now: number): number | null {
+  if (!a || a.startedAt === undefined || a.endedAt !== undefined) return null
+  return now - a.startedAt >= SLOW_AFTER_MS ? now - a.startedAt : null
 }
 
 /** The step a new action belongs to: the one in progress, else the last one started. */

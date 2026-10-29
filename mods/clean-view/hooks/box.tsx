@@ -4,7 +4,7 @@ import type { EngineInterface, RenderChildren, RenderElement } from 'claude-code
 
 import type { Checklist } from '../types'
 import { BAR_BOX_PX, BAR_CELL_PX, LABEL_CELLS, METER, barSvg, meterCells, meterRuns, stepWindow } from './bars'
-import { currentStep, firstSentence } from './checklist'
+import { currentStep, firstSentence, runningFor } from './checklist'
 import { PASTEL } from './palette'
 import type { RenderEvent } from './render'
 import { DEFAULT_TITLE, REASON_REPLY, STUCK_FAILING } from './state'
@@ -45,6 +45,8 @@ export async function drawBox(
     </Box>
   )
   const elapsed = formatDuration((c.finishedAt ?? now) - startedAt)
+  // A slow action carries its own clock, so a long command does not look frozen.
+  const clock = (ms: number | null) => (ms === null ? '' : ` · ${formatDuration(ms)}`)
   // With no to-do list the header is the only line, so it carries the latest action the way a step's row does.
   const doing = c.tasks.length === 0 ? c.actions.findLast(a => !a.isHelper) : undefined
   // The latest thing Claude said between tool calls, which the transcript no longer shows. It sits beside
@@ -58,7 +60,7 @@ export async function drawBox(
     <Box flexDirection="row" flexShrink={1}>
       <Text bold color={PASTEL.working}>{'✱ Working…'}</Text>
       <Box flexDirection="row" flexShrink={1} marginLeft={1}>
-        <Text dimColor wrap="truncate-end">{`· ${doing.icon} ${doing.detail || doing.label}`}</Text>
+        <Text dimColor wrap="truncate-end">{`· ${doing.icon} ${doing.detail || doing.label}${clock(runningFor(doing, now))}`}</Text>
         {doing.isFailed && (
           <Box flexShrink={0}>
             <Text color={PASTEL.error}>{" · didn't work"}</Text>
@@ -183,7 +185,7 @@ export async function drawBox(
     // The icon and the bar say whether a step is running or waiting; the label only gives the facts.
     const label = task.status === 'done' ? 'Done' : isActive && task.hasReported ? `${task.percent}%` : ''
     const hasTrail = isActive && showsTrail && latest !== undefined
-    const trailText = latest ? `${latest.icon} ${latest.detail || latest.label}` : ''
+    const trailText = latest ? `${latest.icon} ${latest.detail || latest.label}${clock(runningFor(latest, now))}` : ''
     const row = (
       <Box key={`task-${task.id}`} flexDirection="row" alignItems="center">
         <Text color={task.status === 'done' ? PASTEL.done : isActive ? PASTEL.working : undefined} dimColor={task.status === 'upcoming'}>

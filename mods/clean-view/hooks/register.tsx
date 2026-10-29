@@ -195,14 +195,16 @@ export const register: Register = on => {
       const summary = describeAction(tool, e, OWN_PREFIX)
       if (!summary) return next(e)
       const id = e.tool_use_id ?? newId('a')
+      const helperStart = await $.clock.now()
       await update($, checklistAtom, c =>
         isRunningPhase(c)
-          ? recordAction(c, { id, ...summary, full: describeFull(tool, e), step: currentStep(c), isHelper: true, isFailed: false, note: '', output: '' })
+          ? recordAction(c, { id, ...summary, full: describeFull(tool, e), step: currentStep(c), isHelper: true, isFailed: false, note: '', output: '', startedAt: helperStart })
           : c,
       )
       const ran = await next(e)
       const output = outputOf(tool, ran)
-      await update($, checklistAtom, c => setOutput(c, id, output))
+      const helperEnd = await $.clock.now()
+      await update($, checklistAtom, c => setOutput(c, id, output, helperEnd))
       if (ran.deny !== undefined || ran.isError === true) {
         const note = firstLine(ran.deny ?? ran.text)
         await update($, checklistAtom, c => markFailed(c, id, note))
@@ -212,6 +214,7 @@ export const register: Register = on => {
 
     const summary = describeAction(tool, e, OWN_PREFIX)
     const actionId = e.tool_use_id ?? newId('a')
+    const actionStart = await $.clock.now()
     await update($, checklistAtom, c => {
       let changed = tool === 'AskUserQuestion' ? setNeedsYou(c, REASON_QUESTION) : clearNeedsYou(c)
       if (summary) {
@@ -224,6 +227,7 @@ export const register: Register = on => {
           isFailed: false,
           note: '',
           output: '',
+          startedAt: actionStart,
         })
       }
       return changed
@@ -236,7 +240,7 @@ export const register: Register = on => {
     const now = await $.clock.now()
 
     await update($, checklistAtom, c => {
-      let changed = setOutput(c, actionId, output)
+      let changed = setOutput(c, actionId, output, now)
       if (tool === 'AskUserQuestion' || changed.needsYouReason === REASON_PERMISSION) changed = clearNeedsYou(changed)
 
       if (!isFailed) {

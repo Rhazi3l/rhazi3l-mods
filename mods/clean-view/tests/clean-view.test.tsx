@@ -570,6 +570,39 @@ describe('checklist', () => {
     await pane.unmount()
   })
 
+  test('Copy errors puts each failed action and its answer on the clipboard', async ($, on) => {
+    const copied: string[] = []
+    on('ui.copy', (_$, e) => ({ value: (copied.push(e.text), { isCopied: true }) }) as never)
+    on('tool.call', { tool: 'Bash' }, () => ({ result: 'failed', isError: true, text: 'bash: hugo: command not found' }) as never)
+    await startJob($, on)
+    await todo($, ['Read your notes', 'Build the site'])
+    await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/brand.md' })
+    await $.tool.call({ tool: 'Bash', command: 'hugo build', description: 'Build the site' })
+    await $.turn.complete({ turnId: 't1', answer: 'Done.', reason: 'answer' } as never)
+    const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    await pane.press({ key: 'clean-view-copy' })
+    await pane.unmount()
+    expect(copied).toHaveLength(1)
+    expect(copied[0]).toContain('hugo build')
+    expect(copied[0]).toContain('bash: hugo: command not found')
+    expect(copied[0]).not.toContain('brand.md')
+  })
+
+  test('a command that is still running shows its own clock once it is slow', async ($, on) => {
+    on('tool.call', { tool: 'Bash' }, () => new Promise(() => {}) as never)
+    const clock = await startJob($, on)
+    await todo($, ['Read your notes', 'Build the site'])
+    void $.tool.call({ tool: 'Bash', command: 'hugo build', description: 'Build the site' })
+    await clock.advance(1_000)
+    const quick = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect((await quick.find({ key: 'clean-view-trail' }))?.text).not.toMatch(/ · \d+s$/)
+    await quick.unmount()
+    await clock.advance(9_000)
+    const slow = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await slow.find({ key: 'clean-view-trail' })).toMatchObject({ text: expect.stringMatching(/ · 10s$/) })
+    await slow.unmount()
+  })
+
   test('a long job that ends where it needs you sends one alert, a short one none, and /view alerts off silences it', async ($, on) => {
     const told: string[] = []
     on('ui.notify', (_$, e) => ({ value: (told.push(e.text), { isSent: true, channel: 'kitty' }) }) as never)

@@ -3,7 +3,7 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { Checklist, ChecklistAction } from '../types'
-import { detailGroups, isRunningPhase } from './checklist'
+import { detailGroups, errorReport, isRunningPhase } from './checklist'
 import { PASTEL } from './palette'
 import type { RenderEvent } from './render'
 import { DETAILS_PANE, DETAILS_TITLE } from './state'
@@ -33,6 +33,12 @@ async function scrollDetails($: EngineInterface, where: { to: 'end' | { key: str
 
 export function followDetails($: EngineInterface) {
   return scrollDetails($, { to: 'end' })
+}
+
+/** Puts every failed action, with what it answered, on the clipboard, and says whether it took. */
+async function copyErrors($: EngineInterface, e: RenderEvent<'Pane'>, c: Checklist) {
+  const copied = await $.ui.copy({ text: errorReport(c), surface: e.surface })
+  await $.ui.toast(copied.isCopied ? 'Errors copied' : 'Could not copy the errors')
 }
 
 /** The Details pane: every step of the job and every action under it, in full. */
@@ -146,6 +152,9 @@ export async function drawDetails($: EngineInterface, e: RenderEvent<'Pane'>, c:
         <Box key="clean-view-switches" flexDirection="row" flexWrap="wrap" gap={1} marginTop={1}>
           {canFold && !view.errorsOnly && (
             <Button key="clean-view-fold" label={view.showsAll ? 'Fold finished' : 'Show all'} onPress={view.toggleAll} />
+          )}
+          {failed > 0 && (
+            <Button key="clean-view-copy" label="Copy errors" onPress={() => copyErrors($, e, c)} />
           )}
           {failed > 0 && (
             <Button key="clean-view-errors" label={view.errorsOnly ? 'All actions' : 'Errors only'} onPress={view.toggleErrors} />
