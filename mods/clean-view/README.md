@@ -4,7 +4,7 @@ A plain-English checklist above the prompt in place of Claude Code's technical r
 
 ## What you see
 
-**The box.** It is there whenever Claude works, and its colour says how the job stands: orange `✱` working, blue `?` needs you, yellow `⚠` stuck or `■` stopped, green `✓` done.
+**The box.** It is there whenever Claude works, and its colour says how the job stands: orange `✱` working, blue `‖` waiting for you, yellow `⚠` stuck (or paused, when you refused a step) or `■` stopped, green `✓` done.
 
 - **Header.** `✱ Working on your request · 2 of 6`, then the latest thing Claude said between tool calls (its first sentence, after `💬`), then on the right a `🤖 1 helper` light while a helper agent runs, the time and a **Details** button. Before a to-do list exists the header is one line, `✱ Working…`, with the latest action.
 - **Steps.** At most three rows: the step in progress first, then what comes next, with one dim line for the rest (`✓ 2 earlier steps done · 1 more to come`). Each row has an icon, the step name, a bar that sweeps while the step runs and fills when it is done, and `Done` or a percentage when one is known. The latest action sits on the step in progress, after its name, with its own clock once it has run for 5 seconds without an answer. On the desktop app the bars are drawn as images so they line up with their rows.

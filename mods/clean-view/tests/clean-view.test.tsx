@@ -2,9 +2,10 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+import { EMPTY } from '../hooks/state'
 import { PASTEL } from '../hooks/palette'
 import { barSvg, meterCells, stepWindow } from '../hooks/bars'
-import { asksSomething, plannedTodos } from '../hooks/checklist'
+import { asksSomething, plannedTodos, stuckText, waitingText } from '../hooks/checklist'
 import { noteScroll, keepInView } from '../hooks/panes'
 import { cleanName, describeAction, extractQuestion, quickReplies } from '../hooks/text'
 
@@ -190,7 +191,7 @@ describe('checklist', () => {
     await $.turn.complete({ turnId: 't1', answer: 'Which one do you want?', reason: 'answer' } as never)
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await ui.find({ key: 'clean-view-frame' })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /Needs you/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Waiting for you/ })).toBeDefined()
     await ui.unmount()
   })
 
@@ -319,11 +320,11 @@ describe('checklist', () => {
     await ui.unmount()
   })
 
-  test('a permission prompt shows Needs you', async ($, on) => {
+  test('a permission prompt shows Waiting for you', async ($, on) => {
     await startJob($, on)
     await $.classic.Notification({ message: 'Claude needs your permission to use Bash', notification_type: 'permission_prompt' })
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await ui.find({ type: 'Text', text: /Needs you/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Waiting for you/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /needs your OK/ })).toBeDefined()
     await ui.unmount()
   })
@@ -776,7 +777,7 @@ describe('replying to a question', () => {
     await $.turn.complete({ turnId: 't1', answer: OPTIONS, reason: 'answer' } as never)
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
-      expect(await ui.find({ type: 'Text', text: /Needs you/ })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /Waiting for you/ })).toBeDefined()
       expect(await ui.find({ key: 'clean-view-question' })).toMatchObject({ text: expect.stringContaining('Which do you want?') })
       expect(await ui.find({ key: 'clean-view-reply-0' })).toMatchObject({ text: 'Option 1', props: { variant: 'primary' } })
       expect(await ui.find({ key: 'clean-view-reply-2' })).toMatchObject({ text: 'Option 3' })
@@ -796,14 +797,14 @@ describe('replying to a question', () => {
     await todo($, ['Read your notes'], 1)
     await $.turn.complete({ turnId: 't1', answer: 'All done. Want me to push it?', reason: 'answer' } as never)
     const waiting = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await waiting.find({ type: 'Text', text: /Needs you/ })).toBeDefined()
+    expect(await waiting.find({ type: 'Text', text: /Waiting for you/ })).toBeDefined()
     expect(await waiting.find({ key: 'clean-view-reply-0' })).toMatchObject({ text: 'Yes' })
     await waiting.unmount()
 
     await $.prompt.submit({ text: 'Yes', wait: false, origin: RUN.origin })
     await $.turn.start({ text: 'Yes', turnId: 't2' })
     const next = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await next.find({ type: 'Text', text: /Needs you/ })).toBeUndefined()
+    expect(await next.find({ type: 'Text', text: /Waiting for you/ })).toBeUndefined()
     expect(await next.find({ key: 'clean-view-question' })).toBeUndefined()
     expect(await next.find({ type: 'Text', text: '✱ Working…' })).toBeDefined()
     await next.unmount()
@@ -829,9 +830,19 @@ describe('frame colours', () => {
     await $.turn.complete({ turnId: 't1', answer: 'Which one do you want?', reason: 'answer' } as never)
     const waiting = await $.ui.mount({ ...BAND, surface: 'desktop' })
     expect(await waiting.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.waiting } })
-    expect(await waiting.find({ type: 'Text', text: /^\? Needs you · / })).toMatchObject({ props: { color: PASTEL.waiting } })
+    expect(await waiting.find({ type: 'Text', text: /^‖ Waiting for you/ })).toMatchObject({ props: { color: PASTEL.waiting } })
     expect(JSON.stringify(await waiting.find({ key: 'clean-view-header' }))).not.toContain('backgroundColor')
     await waiting.unmount()
+  })
+})
+
+describe('the words of the waiting and stuck headers', () => {
+  test('a reply is just Waiting for you, an OK or a question says why, a refused step is Paused', async () => {
+    expect(waitingText({ ...EMPTY, needsYouReason: '' })).toBe('Waiting for you')
+    expect(waitingText({ ...EMPTY, needsYouReason: 'needs your OK' })).toBe('Waiting for you · needs your OK')
+    expect(waitingText({ ...EMPTY, needsYouReason: 'has a question' })).toBe('Waiting for you · has a question')
+    expect(stuckText({ ...EMPTY, stuckReason: 'a step keeps failing, trying another way' })).toBe('Stuck · a step keeps failing, trying another way')
+    expect(stuckText({ ...EMPTY, stuckReason: 'you said no to a step' })).toBe('Paused · you said no to a step')
   })
 })
 
@@ -850,7 +861,7 @@ describe('waiting for you', () => {
     await $.turn.complete({ turnId: 't1', answer: 'The mods are installed.', reason: 'answer' } as never)
     const done = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await done.find({ type: 'Text', text: /^✓ All done · / })).toBeDefined()
-    expect(await done.find({ type: 'Text', text: /Needs you/ })).toBeUndefined()
+    expect(await done.find({ type: 'Text', text: /Waiting for you/ })).toBeUndefined()
     await done.unmount()
 
     await $.prompt.submit({ text: 'Another job', wait: false, origin: RUN.origin })
@@ -858,7 +869,7 @@ describe('waiting for you', () => {
     await todo($, ['Look at it', 'Report back'])
     await $.turn.complete({ turnId: 't2', answer: 'Which one should I use?', reason: 'answer' } as never)
     const asking = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await asking.find({ type: 'Text', text: /Needs you/ })).toBeDefined()
+    expect(await asking.find({ type: 'Text', text: /Waiting for you/ })).toBeDefined()
     await asking.unmount()
   })
 })

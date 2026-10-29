@@ -1,7 +1,7 @@
 // The checklist as a value: every change to a job is a pure function from one Checklist to the next.
 
 import type { Checklist, ChecklistAction, ChecklistTask } from '../types'
-import { DEFAULT_TITLE, REASON_REPLY, STUCK_FAILING } from './state'
+import { DEFAULT_TITLE, STUCK_FAILING, STUCK_REFUSED } from './state'
 import { cleanName, clipOutput, extractQuestion, quickReplies } from './text'
 
 const MAX_ACTIONS = 300
@@ -108,11 +108,20 @@ export function recordNote(c: Checklist, id: string, text: string): Checklist {
   return { ...c, notes: [...c.notes, note].slice(-100) }
 }
 
+/** The header of a job that waits for the person: `Waiting for you`, and why when it is more than a reply. */
+export const waitingText = (c: Checklist) => (c.needsYouReason ? `Waiting for you · ${c.needsYouReason}` : 'Waiting for you')
+
+/** The header of a job that cannot go on: `Paused` when the person refused a step, else `Stuck`, with the reason. */
+export function stuckText(c: Checklist): string {
+  const reason = c.stuckReason ?? STUCK_FAILING
+  return `${reason === STUCK_REFUSED ? 'Paused' : 'Stuck'} · ${reason}`
+}
+
 /** What to tell the person when a job ends where it needs them, or null when there is nothing to say (a stop they asked for). */
 export function alertText(c: Checklist): string | null {
   if (c.phase === 'done') return c.tasks.length > 0 ? `All done · ${c.tasks.length} step${c.tasks.length === 1 ? '' : 's'}` : 'All done'
-  if (c.phase === 'needsYou') return c.question !== '' ? c.question.slice(0, 200) : `Needs you · ${c.needsYouReason ?? REASON_REPLY}`
-  if (c.phase === 'stuck') return `Stuck: ${c.stuckReason ?? STUCK_FAILING}`
+  if (c.phase === 'needsYou') return c.question !== '' ? c.question.slice(0, 200) : waitingText(c)
+  if (c.phase === 'stuck') return stuckText(c)
   return null
 }
 

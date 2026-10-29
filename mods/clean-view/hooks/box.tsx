@@ -4,10 +4,10 @@ import type { EngineInterface, RenderChildren, RenderElement } from 'claude-code
 
 import type { Checklist } from '../types'
 import { BAR_BOX_PX, BAR_CELL_PX, LABEL_CELLS, METER, barSvg, meterCells, meterRuns, stepWindow } from './bars'
-import { currentStep, firstSentence, runningFor } from './checklist'
+import { currentStep, firstSentence, runningFor, stuckText, waitingText } from './checklist'
 import { PASTEL } from './palette'
 import type { RenderEvent } from './render'
-import { DEFAULT_TITLE, REASON_REPLY, STUCK_FAILING } from './state'
+import { DEFAULT_TITLE } from './state'
 import { MAX_NAME, formatDuration, trimToWidth } from './text'
 import { openDetails } from './panes'
 
@@ -84,13 +84,13 @@ export async function drawBox(
   if (c.phase === 'needsYou') {
     header = (
       <Text color={PASTEL.waiting} wrap="truncate-end">
-        {`? Needs you · ${c.needsYouReason ?? REASON_REPLY}`}
+        {`‖ ${waitingText(c)}`}
       </Text>
     )
   } else if (c.phase === 'stuck') {
     header = (
       <Text color={PASTEL.stuck} wrap="truncate-end">
-        {`⚠ Stuck: ${c.stuckReason ?? STUCK_FAILING}`}
+        {`⚠ ${stuckText(c)}`}
       </Text>
     )
   } else if (c.phase === 'stopped') {

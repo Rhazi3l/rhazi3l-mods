@@ -8,11 +8,12 @@ export const DEFAULT_TITLE = 'Working on your request'
 export const DETAILS_PANE = 'clean-view-details'
 export const DETAILS_TITLE = 'What Claude did'
 
-export const REASON_PERMISSION = 'Claude needs your OK to continue'
-export const REASON_QUESTION = 'Claude has a question for you'
-export const REASON_REPLY = 'Claude is waiting for your reply'
-export const STUCK_REFUSED = 'you said no to a step, so Claude paused'
-export const STUCK_FAILING = 'a step keeps failing, Claude is trying another way'
+/** Why Claude is waiting, as the box says it after `Waiting for you`; a plain reply needs no reason. */
+export const REASON_PERMISSION = 'needs your OK'
+export const REASON_QUESTION = 'has a question'
+export const REASON_REPLY = ''
+export const STUCK_REFUSED = 'you said no to a step'
+export const STUCK_FAILING = 'a step keeps failing, trying another way'
 export const STUCK_REFUSAL = "Claude couldn't help with that request"
 
 export const EMPTY: Checklist = {
