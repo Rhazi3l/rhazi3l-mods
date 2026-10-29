@@ -40,10 +40,10 @@ const RESPONSE = {
 type Windows = { kind: string; percentUsed: number; resetsAt?: string }[]
 
 /** The engine's answers beneath the plugin. */
-async function startSession($: Engine, on: On, options: { stored?: Record<string, unknown>; windows?: Windows; plan?: string } = {}) {
+async function startSession($: Engine, on: On, options: { stored?: Record<string, unknown>; windows?: Windows; plan?: string; home?: string } = {}) {
   clock = mock.clock(on, { now: NOW })
   mock.store(on, options.stored)
-  mock.env(on, { HOME: '/home/test' })
+  mock.env(on, options.home === undefined ? { HOME: '/home/test' } : { USERPROFILE: options.home })
   const account = options.plan ? { oauthAccount: { organizationType: options.plan } } : {}
   on('fs.read', (_$, e) => (e.path === '/home/test/.claude.json' ? ({ value: JSON.stringify(account) } as never) : ({ deny: 'no such file' } as never)))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
@@ -156,6 +156,22 @@ describe('deskbar', () => {
     await startSession($, on, { windows: [FIVE] })
     const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
     expect(await band.find({ type: 'Text', text: 'Subscription' })).toBeDefined()
+    await band.unmount()
+  })
+
+  test('a plan with no usage windows (an Enterprise seat may report none) shows the plan and no blank figures', async ($, on) => {
+    await startSession($, on, { plan: 'claude_enterprise' })
+    const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    expect(await band.find({ type: 'Text', text: 'Enterprise' })).toBeDefined()
+    expect(await band.find({ key: 'five' })).toBeUndefined()
+    expect(await band.find({ key: 'week' })).toBeUndefined()
+    await band.unmount()
+  })
+
+  test('on Windows the plan is read from the USERPROFILE folder', async ($, on) => {
+    await startSession($, on, { plan: 'claude_max', home: '/home/test' })
+    const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    expect(await band.find({ type: 'Text', text: 'Max' })).toBeDefined()
     await band.unmount()
   })
 

@@ -59,8 +59,8 @@ async function readUsage($: EngineInterface) {
 /** The plan the person's login record names, read from the same config file the login keeps (`organizationType`). */
 async function readPlan($: EngineInterface) {
   try {
-    const dir = await $.env.get('CLAUDE_CONFIG_DIR')
-    const home = dir ?? (await $.env.get('HOME'))
+    // The config folder if one is set, else the home folder: HOME on Linux and macOS, USERPROFILE on Windows.
+    const home = (await $.env.get('CLAUDE_CONFIG_DIR')) ?? (await $.env.get('HOME')) ?? (await $.env.get('USERPROFILE'))
     if (!home) return
     const account = JSON.parse(await $.fs.read(`${home}/.claude.json`)).oauthAccount
     const plan = planName(account?.organizationType)
