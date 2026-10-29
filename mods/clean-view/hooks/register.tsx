@@ -7,7 +7,7 @@
 // View off) leaves Claude Code as it is.
 
 import { atom, derive, read, update } from 'claude-code'
-import type { Register, RenderChildren, Timer } from 'claude-code'
+import type { EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
 
 import type { Checklist, ChecklistAction, ChecklistTask, CleanViewStyle, ViewMode } from '../types'
 import { COMMANDS, TOOLS } from './info'
@@ -284,6 +284,19 @@ function meterRuns(cells: boolean[]): { lit: boolean; text: string }[] {
 
 // ---------- Hooks ----------
 
+/**
+ * A /clear starts the session's values over and fires no session.start, so Clean View's on/off (which the
+ * toolbox reads to show its button) and style are written again from what was saved.
+ */
+async function restoreAfterClear($: EngineInterface) {
+  const { value } = await $.state.get({ plugin: 'clean-view', key: 'isOn' } as const)
+  if (value !== undefined) return
+  const savedOn = await $.store.get(STORE_ON)
+  const savedStyle = await $.store.get(STORE_STYLE)
+  await update($, isOnAtom, () => (typeof savedOn === 'boolean' ? savedOn : true))
+  await update($, styleAtom, (): CleanViewStyle => (savedStyle === 'simple' ? 'simple' : 'guided'))
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const savedOn = await $.store.get(STORE_ON)
@@ -348,7 +361,13 @@ export const register: Register = on => {
     }
   })
 
+  on('session.end', async ($, e, next) => {
+    if (e.reason === 'clear') $.clock.after(200, () => void restoreAfterClear($))
+    return next(e)
+  })
+
   on('turn.start', async ($, e, next) => {
+    await restoreAfterClear($)
     const started = await next(e)
     if (e.agentId !== undefined) return started
 

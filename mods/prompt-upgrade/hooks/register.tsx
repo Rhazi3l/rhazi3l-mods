@@ -90,6 +90,14 @@ async function editInBox($: EngineInterface, text: string) {
   }
 }
 
+/** A /clear starts the session's values over and fires no session.start, so the on/off the toolbox reads is written again from what was saved. */
+async function restoreAfterClear($: EngineInterface) {
+  const { value } = await $.state.get({ plugin: 'prompt-upgrade', key: 'isOn' } as const)
+  if (value !== undefined) return
+  const saved = await $.store.get(STORE_ON)
+  await update($, isOnAtom, () => (typeof saved === 'boolean' ? saved : true))
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const saved = await $.store.get(STORE_ON)
@@ -105,6 +113,16 @@ export const register: Register = on => {
     } catch {
       // Not bound (a headless host): the mod still follows what it can.
     }
+    return next(e)
+  })
+
+  on('session.end', async ($, e, next) => {
+    if (e.reason === 'clear') $.clock.after(200, () => void restoreAfterClear($))
+    return next(e)
+  })
+
+  on('turn.start', async ($, e, next) => {
+    await restoreAfterClear($)
     return next(e)
   })
 

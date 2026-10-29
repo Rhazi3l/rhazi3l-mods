@@ -1,6 +1,6 @@
 {
   "name": "prompt-upgrade",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "An Upgrade prompt button beside the Toolbox (or /better) turns a rough prompt into a clearer one. A pane shows your prompt beside the upgrade, and nothing is sent until you press Run it.",
   "author": {
     "name": "Rhazi3l"

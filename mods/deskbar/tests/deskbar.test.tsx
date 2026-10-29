@@ -252,4 +252,16 @@ describe('deskbar', () => {
     expect(await band.find({ key: 'deskbar' })).toBeUndefined()
     await band.unmount()
   })
+
+  test('after a /clear wipes the session\'s values, the on/off is written again from what was saved', async ($, on) => {
+    const written: unknown[] = []
+    // The wiped session: the value reads as never written, and each write is recorded.
+    on('state.get', () => ({ value: { value: undefined, version: 0 } }) as never)
+    on('state.set', (_$, e) => (written.push([e.key, e.value]), { value: { isSet: true, version: 1 } }) as never)
+    await startSession($, on, { stored: { isOn: false } })
+    written.length = 0
+    await $.session.end({ reason: 'clear', sessionId: 'chat-1', resume: { id: 'chat-1' } } as never)
+    await clock.advance(300)
+    expect(written).toContainEqual(['isOn', false])
+  })
 })

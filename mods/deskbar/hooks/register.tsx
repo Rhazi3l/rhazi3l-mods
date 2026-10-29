@@ -83,6 +83,14 @@ async function estimateFresh($: EngineInterface) {
   }
 }
 
+/** A /clear starts the session's values over and fires no session.start, so the on/off the toolbox reads is written again from what was saved. */
+async function restoreAfterClear($: EngineInterface) {
+  const { value } = await $.state.get({ plugin: 'deskbar', key: 'isOn' } as const)
+  if (value !== undefined) return
+  const saved = await $.store.get(STORE_ON)
+  await update($, isOnAtom, () => (typeof saved === 'boolean' ? saved : true))
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const saved = await $.store.get(STORE_ON)
@@ -174,7 +182,15 @@ export const register: Register = on => {
 
   // A /clear starts a chat with an empty cache.
   on('session.end', async ($, e, next) => {
-    if (e.reason === 'clear') await update($, chatAtom, now => ({ ...EMPTY_CHAT, model: now.model, effort: now.effort, plan: now.plan }))
+    if (e.reason === 'clear') {
+      await update($, chatAtom, now => ({ ...EMPTY_CHAT, model: now.model, effort: now.effort, plan: now.plan }))
+      $.clock.after(200, () => void restoreAfterClear($))
+    }
+    return next(e)
+  })
+
+  on('turn.start', async ($, e, next) => {
+    await restoreAfterClear($)
     return next(e)
   })
 
