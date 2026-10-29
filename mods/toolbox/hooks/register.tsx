@@ -42,7 +42,7 @@ const DESKBAR: SiblingMod = {
   id: 'deskbar',
   name: 'Deskbar',
   command: 'deskbar',
-  description: 'A band above the prompt in the desktop app with the plan, model, effort, context, prompt cache and 5h and weekly usage',
+  description: 'A band above the prompt in the desktop app with the plan, context, 5h and weekly usage and prompt cache',
 }
 
 const SIBLINGS = [CLEAN_VIEW, PROMPT_UPGRADE, DESKBAR]
@@ -221,8 +221,11 @@ export const register: Register = on => {
         $.ui.toast(`Couldn't set the advisor to ${choice}.`)
       }
     }
+    // The desktop app draws its buttons with a hairline between them and its rows touching, so there
+    // each gets room; the terminal draws what is written, brackets and all.
+    const isTerminal = e.surface === 'terminal'
     const buttons = (children: RenderChildren) => (
-      <Box flexDirection="row" flexWrap="wrap" flexShrink={1}>
+      <Box flexDirection="row" flexWrap="wrap" flexShrink={1} columnGap={isTerminal ? undefined : 'sm'} rowGap={isTerminal ? undefined : 'sm'}>
         {children}
       </Box>
     )
@@ -236,7 +239,9 @@ export const register: Register = on => {
           flexDirection="column"
           borderStyle="round"
           borderColor={PASTEL.working}
-          paddingX={1}
+          paddingX={isTerminal ? 1 : 'md'}
+          paddingY={isTerminal ? undefined : 'sm'}
+          gap={isTerminal ? undefined : 'sm'}
         >
           <Box flexDirection="row" justifyContent="space-between">
             <Box flexGrow={1} flexShrink={1}>

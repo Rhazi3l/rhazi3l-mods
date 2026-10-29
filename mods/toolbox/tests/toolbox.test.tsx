@@ -155,6 +155,19 @@ describe('toolbox', () => {
     }
   })
 
+  test('the desktop panel gives its rows and buttons room; the terminal draws them as written', async ($, on) => {
+    await startSession($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
+    const desktop = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    expect(await desktop.find({ key: 'toolbox-panel' })).toMatchObject({ props: { gap: 'sm' } })
+    expect(JSON.stringify(await desktop.find({ key: 'toolbox-model' }))).toContain('"columnGap":"sm"')
+    await desktop.unmount()
+    const terminal = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(JSON.stringify(await terminal.find({ key: 'toolbox-panel' }))).not.toContain('"gap"')
+    expect(JSON.stringify(await terminal.find({ key: 'toolbox-model' }))).not.toContain('Gap')
+    await terminal.unmount()
+  })
+
   test('with no other mods installed, there is no Mods row and /mods says how to add one', async ($, on) => {
     await startSession($, on)
     await $.command.run({ command: 'toolbox', args: '', ...RUN })

@@ -10,17 +10,6 @@ import { PASTEL } from './palette'
  */
 export const CACHE_TTL_MS = 60 * 60 * 1000
 
-const FAMILY = /(opus|sonnet|haiku|fable|mythos)(?:[-_ ]?(\d+)(?:[-._](\d+))?)?/i
-
-/** `claude-opus-5-5[1m]` → `Opus 5.5`, `sonnet` → `Sonnet`; anything else as given. */
-export function prettyModel(model: string): string {
-  const [, family, major, minor] = FAMILY.exec(model) ?? []
-  if (!family) return model || 'Claude'
-  const name = family.charAt(0).toUpperCase() + family.slice(1).toLowerCase()
-  if (!major) return name
-  return minor ? `${name} ${major}.${minor}` : `${name} ${major}`
-}
-
 /** `claude_pro` → `Pro`, `claude_enterprise` → `Enterprise`; the plan as the login record names it, or null. */
 export function planName(type: unknown): string | null {
   if (typeof type !== 'string') return null

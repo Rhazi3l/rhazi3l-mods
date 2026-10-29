@@ -1,5 +1,5 @@
 // Deskbar: the status line's figures as a band above the prompt, for the desktop app, which
-// does not draw the status line setting. Model, effort, context, prompt cache and the 5h and
+// does not draw the status line setting. Plan, context, prompt cache and the 5h and
 // weekly usage, in the rules of ~/.claude/statusline.sh (statusline/statusline.sh in the repository).
 // It records on every surface and draws only off the terminal, so a chat used in the terminal and
 // resumed on the desktop comes up filled in. Colours are the mods' palette.
@@ -9,12 +9,10 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { DeskbarChat, DeskbarUsage } from '../types'
 import { PASTEL } from './palette'
-import { barCells, cacheLeftMs, formatTokens, levelColor, planName, prettyModel, untilTime } from './text'
+import { barCells, cacheLeftMs, formatTokens, levelColor, planName, untilTime } from './text'
 
 const EMPTY_USAGE: DeskbarUsage = { contextPercent: null, windows: [] }
 const EMPTY_CHAT: DeskbarChat = {
-  model: '',
-  effort: null,
   lastAt: null,
   contextTokens: 0,
   freshTokens: null,
@@ -30,7 +28,7 @@ const tickAtom = atom({ plugin: 'deskbar', key: 'tick' } as const, 0)
 const STORE_ON = 'isOn'
 const STORE_RESPONSES = 'lastResponses'
 const STORE_KEEP = 20
-const USAGE = 'Deskbar shows the model, effort, context, prompt cache and 5h and weekly usage above the prompt in the desktop app. /deskbar on or /deskbar off.'
+const USAGE = 'Deskbar shows the plan, context, 5h and weekly usage and prompt cache above the prompt in the desktop app. /deskbar on or /deskbar off.'
 
 /** What is kept per chat so a resumed one knows whether its cache is still held. */
 type Stored = Record<string, { at: number; tokens: number; first?: number }>
@@ -111,9 +109,6 @@ export const register: Register = on => {
     await readUsage($)
     await readPlan($)
     try {
-      const model = await $.session.model()
-      const effort = (await $.settings.read()).effortLevel
-      await update($, chatAtom, now => ({ ...now, model, effort: now.effort ?? (typeof effort === 'string' ? effort : null) }))
       // A resumed chat: when it last got a response, and the size its first prompt had.
       const held = ((await $.store.get(STORE_RESPONSES)) ?? {}) as Stored
       const was = held[await $.session.id()]
@@ -151,12 +146,8 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // The model and effort each main-loop request really goes out with, and when the main thread was last answered.
+  // When the main thread was last answered, and how big its context is.
   on('turn.step', async function* ($, e, next) {
-    if (e.agentId === undefined) {
-      const effort = e.effort === undefined ? null : String(e.effort)
-      await update($, chatAtom, now => ({ ...now, model: e.model, effort }))
-    }
     const response = yield* next(e)
     // Only the main thread warms the main thread's cache; a helper agent's request doesn't.
     if (e.agentId === undefined && response.usage) {
@@ -183,7 +174,7 @@ export const register: Register = on => {
   // A /clear starts a chat with an empty cache.
   on('session.end', async ($, e, next) => {
     if (e.reason === 'clear') {
-      await update($, chatAtom, now => ({ ...EMPTY_CHAT, model: now.model, effort: now.effort, plan: now.plan }))
+      await update($, chatAtom, now => ({ ...EMPTY_CHAT, plan: now.plan }))
       $.clock.after(200, () => void restoreAfterClear($))
     }
     return next(e)
@@ -243,16 +234,6 @@ export const register: Register = on => {
             part('plan', [
               <Text key="dot" color={PASTEL.done}>{'◆ '}</Text>,
               <Text key="name">{plan}</Text>,
-            ])}
-          {chat.model !== '' &&
-            part('model', [
-              <Text key="dot" color={PASTEL.waiting}>{'◆ '}</Text>,
-              <Text key="name" bold>{prettyModel(chat.model)}</Text>,
-            ])}
-          {chat.effort !== null &&
-            part('effort', [
-              <Text key="label" dimColor>{'effort '}</Text>,
-              <Text key="value" bold color={PASTEL.waiting}>{chat.effort}</Text>,
             ])}
           {usage.contextPercent !== null &&
             part('context', [

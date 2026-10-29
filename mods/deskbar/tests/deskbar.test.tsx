@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine, MockClock } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { barCells, formatTokens, levelColor, planName, prettyModel, untilTime } from '../hooks/text'
+import { barCells, formatTokens, levelColor, planName, untilTime } from '../hooks/text'
 
 const NOW = Date.parse('2026-10-29T10:00:00Z')
 const HOUR = 3_600_000
@@ -48,8 +48,6 @@ async function startSession($: Engine, on: On, options: { stored?: Record<string
   on('fs.read', (_$, e) => (e.path === '/home/test/.claude.json' ? ({ value: JSON.stringify(account) } as never) : ({ deny: 'no such file' } as never)))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.id', () => ({ value: 'chat-1' }) as never)
-  on('session.model', () => ({ value: 'claude-sonnet-5-5' }) as never)
-  on('settings.read', () => ({ value: { effortLevel: 'medium' } }) as never)
   on('session.usage', () =>
     ({
       value: {
@@ -98,7 +96,6 @@ describe('deskbar words', () => {
     expect(formatTokens(850)).toBe('850')
     expect(formatTokens(174_404)).toBe('174k')
     expect(formatTokens(1_250_000)).toBe('1.2M')
-    expect(prettyModel('claude-sonnet-5-5[1m]')).toBe('Sonnet 5.5')
     expect(planName('claude_pro')).toBe('Pro')
     expect(planName('claude_enterprise')).toBe('Enterprise')
     expect(planName('claude_max')).toBe('Max')
@@ -121,8 +118,10 @@ describe('deskbar', () => {
     const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
     expect(await band.find({ key: 'deskbar' })).toMatchObject({ props: { flexWrap: 'wrap' } })
     expect(await band.find({ type: 'Text', text: 'Pro' })).toBeDefined()
-    expect(await band.find({ type: 'Text', text: 'Sonnet 5.5' })).toBeDefined()
-    expect(await band.find({ type: 'Text', text: 'medium' })).toBeDefined()
+    // The desktop app shows the model and effort itself, so the band leaves them out.
+    expect(await band.find({ type: 'Text', text: 'Sonnet 5.5' })).toBeUndefined()
+    expect(await band.find({ key: 'model' })).toBeUndefined()
+    expect(await band.find({ key: 'effort' })).toBeUndefined()
     expect(await band.find({ type: 'Text', text: ' 30%' })).toBeDefined()
     expect(await band.find({ type: 'Text', text: '12%' })).toBeDefined()
     expect(await band.find({ type: 'Text', text: ' ↻ 2h 10m' })).toBeDefined()
@@ -135,7 +134,7 @@ describe('deskbar', () => {
     await startSession($, on, { windows: [FIVE, WEEK], plan: 'claude_pro' })
     const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
     const tree = JSON.stringify(await band.find({ key: 'deskbar' }))
-    const at = ['"plan"', '"model"', '"context"', '"five"', '"week"', '"cache"'].map(key => tree.indexOf(key))
+    const at = ['"plan"', '"context"', '"five"', '"week"', '"cache"'].map(key => tree.indexOf(key))
     expect(at.every(i => i > -1)).toBe(true)
     expect([...at].sort((a, b) => a - b)).toEqual(at)
     await band.unmount()

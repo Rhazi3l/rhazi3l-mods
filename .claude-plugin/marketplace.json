@@ -23,7 +23,7 @@
     {
       "name": "deskbar",
       "source": "./mods/deskbar",
-      "description": "A band above the prompt in the desktop app with the model, effort, context, prompt cache and 5h and weekly usage, like the terminal status line."
+      "description": "A band above the prompt in the desktop app with the plan, context, 5h and weekly usage and prompt cache, like the terminal status line."
     }
   ]
 }

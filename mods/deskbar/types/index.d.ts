@@ -15,8 +15,6 @@ export type DeskbarUsage = {
 }
 
 export type DeskbarChat = {
-  model: string
-  effort: string | null
   /** When the main thread last got a response (epoch ms); null if none is known for this chat. */
   lastAt: number | null
   /** Tokens the next request re-sends: the last response's input, cache and output tokens. */
