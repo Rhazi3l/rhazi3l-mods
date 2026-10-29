@@ -540,7 +540,7 @@ export const register: Register = on => {
     const elapsed = formatDuration((c.finishedAt ?? now) - c.startedAt)
     let header = (
       <Text bold color={PASTEL.working} wrap="truncate-end">
-        {c.tasks.length === 0 ? '✱ Working…' : `✱ ${c.tasks[0]?.name === c.title ? DEFAULT_TITLE : c.title}`}
+        {c.tasks.length === 0 ? '✱ Working…' : `✱ ${DEFAULT_TITLE}`}
       </Text>
     )
     if (c.phase === 'needsYou') {
@@ -558,13 +558,13 @@ export const register: Register = on => {
     } else if (c.phase === 'stopped') {
       header = (
         <Text color={PASTEL.stuck} wrap="truncate-end">
-          {`■ Stopped${c.tasks.length === 0 ? '' : ` · ${c.title}`} · you pressed Esc`}
+          {'■ Stopped · you pressed Esc'}
         </Text>
       )
     } else if (c.phase === 'done') {
       header = (
         <Text color={PASTEL.done} wrap="truncate-end">
-          {`✓ All done${c.tasks.length === 0 ? '' : ` · ${c.title}`}`}
+          {`✓ All done${c.tasks.length === 0 ? '' : ` · ${c.tasks.length} step${c.tasks.length === 1 ? '' : 's'}`}`}
         </Text>
       )
     }
@@ -846,7 +846,7 @@ export const register: Register = on => {
         <Box flexDirection="row" justifyContent="space-between" flexWrap={e.surface === 'terminal' ? 'nowrap' : 'wrap'}>
           <Box flexDirection="row" flexShrink={1}>
             <Text bold color={PASTEL.working} wrap="truncate-end">
-              {c.title}
+              Your request
             </Text>
             <Text dimColor>{`  ${summary}`}</Text>
           </Box>
@@ -886,6 +886,15 @@ export const register: Register = on => {
     if (e.surface !== 'terminal' || (await read($, modeAtom)) !== 'guided' || !(await read($, checklistAtom)).hasRealPlan) return next(e)
     const { Text } = $.ui.resolve(e)
     return <Text color={PASTEL.working}>{`${e.props.message ?? e.props.word}${e.props.suffix}`}</Text>
+  })
+
+  // A reply button sends its text as the person's words, but the transcript adds a dim
+  // "Prompt from the clean-view plugin" row for it, so the row is drawn as a plain prompt.
+  on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
+    const { origin } = e.props
+    if (origin.kind !== 'plugin' || origin.name !== 'clean-view') return next(e)
+    const { Text } = $.ui.resolve(e)
+    return <Text>{`❯ ${e.props.text}`}</Text>
   })
 
   on('ui.render', { component: 'ToolProgress' }, async ($, e, next) => {
