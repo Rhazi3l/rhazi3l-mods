@@ -12,8 +12,6 @@ export type DeskbarUsage = {
   /** The context window's fill, 0 to 100; null before a response of the live window. */
   contextPercent: number | null
   windows: UsageWindow[]
-  /** What the session has cost, in USD, where the host keeps a ledger. */
-  costUsd: number | null
 }
 
 export type DeskbarChat = {
@@ -25,8 +23,8 @@ export type DeskbarChat = {
   contextTokens: number
   /** What a new chat starts with: the first response's prompt. Null if unknown. */
   freshTokens: number | null
-  /** Whether a response has come back since this mod started, so a missing rate limit means an API key. */
-  hasReplied: boolean
+  /** The plan the login record names (`Pro`, `Max`, `Enterprise`), or null when it can't be read. */
+  plan: string | null
 }
 
 declare module 'claude-code' {

@@ -45,7 +45,7 @@ SEP=" $(fg "$SUBTLE")│$RESET "
 
 # One jq pass for every field, split on the unit separator (a tab would
 # collapse empty fields when read).
-IFS=$'\x1f' read -r model model_id transcript effort ctx five five_at week week_at cost has_limits < <(
+IFS=$'\x1f' read -r model model_id transcript effort ctx five five_at week week_at has_limits < <(
   jq -r '[
     (.model.display_name // .model.id // "Claude"),
     (.model.id // ""),
@@ -56,7 +56,6 @@ IFS=$'\x1f' read -r model model_id transcript effort ctx five five_at week week_
     (.rate_limits.five_hour.resets_at // ""),
     (.rate_limits.seven_day.used_percentage // ""),
     (.rate_limits.seven_day.resets_at // ""),
-    (.cost.total_cost_usd // ""),
     (if .rate_limits then "yes" else "" end)
   ] | map(tostring) | join("\u001f")' <<<"$input"
 )
@@ -127,12 +126,17 @@ cache_part() {
   printf '%s○ cold · resume %s tokens · new chat %s%s' "$(fg "$DIM")" "$(tokens_short "$tokens")" "$(tokens_short "${first_tokens:-0}")" "$RESET"
 }
 
-parts=()
-if [[ -n $has_limits ]]; then
-  parts+=("$(fg "$GREEN")◆$RESET $(fg "$TEXT")Subscription$RESET")
-else
-  parts+=("$(fg "$CYAN")◆$RESET $(fg "$TEXT")API$RESET")
+# The plan as the login record names it (claude_pro -> Pro, claude_enterprise -> Enterprise).
+plan=""
+account="${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json"
+if [[ -r $account ]]; then
+  plan=$(jq -r '.oauthAccount.organizationType // empty' "$account" 2>/dev/null | sed -e 's/^claude_//' -e 's/_/ /g' |
+    awk '{ for (i = 1; i <= NF; i++) printf "%s%s%s", (i > 1 ? " " : ""), toupper(substr($i, 1, 1)), substr($i, 2) }')
 fi
+[[ -z $plan && -n $has_limits ]] && plan="Subscription"
+
+parts=()
+[[ -n $plan ]] && parts+=("$(fg "$GREEN")◆$RESET $(fg "$TEXT")$plan$RESET")
 parts+=("$(fg "$BLUE")◆$RESET $BOLD$(fg "$TEXT")$model$RESET")
 [[ -n $effort ]] && parts+=("$(fg "$DIM")effort$RESET $BOLD$(fg "$CYAN")$effort$RESET")
 if [[ -n $ctx ]]; then
@@ -150,11 +154,6 @@ if [[ -n $week ]]; then
   [[ -n $week_at ]] && reset=" $(fg "$DIM")↻ $(until_time "${week_at%.*}")$RESET"
   parts+=("$(fg "$DIM")week$RESET $BOLD$(fg "$(level "$week")")${week%.*}%$RESET$reset")
 fi
-# Cost only means money on the API; a subscription's figure is notional.
-if [[ -z $has_limits && -n $cost ]]; then
-  parts+=("$(fg "$DIM")cost$RESET $(fg "$TEXT")\$$(printf '%.2f' "$cost")$RESET")
-fi
-
 line=""
 for part in "${parts[@]}"; do
   [[ -n $line ]] && line+=$SEP

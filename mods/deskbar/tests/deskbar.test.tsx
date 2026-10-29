@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine, MockClock } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { barCells, formatTokens, levelColor, prettyModel, untilTime } from '../hooks/text'
+import { barCells, formatTokens, levelColor, planName, prettyModel, untilTime } from '../hooks/text'
 
 const NOW = Date.parse('2026-10-29T10:00:00Z')
 const HOUR = 3_600_000
@@ -40,9 +40,12 @@ const RESPONSE = {
 type Windows = { kind: string; percentUsed: number; resetsAt?: string }[]
 
 /** The engine's answers beneath the plugin. */
-async function startSession($: Engine, on: On, options: { stored?: Record<string, unknown>; windows?: Windows } = {}) {
+async function startSession($: Engine, on: On, options: { stored?: Record<string, unknown>; windows?: Windows; plan?: string } = {}) {
   clock = mock.clock(on, { now: NOW })
   mock.store(on, options.stored)
+  mock.env(on, { HOME: '/home/test' })
+  const account = options.plan ? { oauthAccount: { organizationType: options.plan } } : {}
+  on('fs.read', (_$, e) => (e.path === '/home/test/.claude.json' ? ({ value: JSON.stringify(account) } as never) : ({ deny: 'no such file' } as never)))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.id', () => ({ value: 'chat-1' }) as never)
   on('session.model', () => ({ value: 'claude-sonnet-5-5' }) as never)
@@ -96,6 +99,10 @@ describe('deskbar words', () => {
     expect(formatTokens(174_404)).toBe('174k')
     expect(formatTokens(1_250_000)).toBe('1.2M')
     expect(prettyModel('claude-sonnet-5-5[1m]')).toBe('Sonnet 5.5')
+    expect(planName('claude_pro')).toBe('Pro')
+    expect(planName('claude_enterprise')).toBe('Enterprise')
+    expect(planName('claude_max')).toBe('Max')
+    expect(planName(undefined)).toBeNull()
     expect(barCells(30)).toEqual({ lit: '▰▰▰', unlit: '▱▱▱▱▱▱▱' })
     expect(barCells(1).lit).toBe('▰')
     expect(barCells(120).unlit).toBe('')
@@ -106,14 +113,14 @@ describe('deskbar words', () => {
 
 describe('deskbar', () => {
   test('the terminal draws nothing; the desktop draws every figure', async ($, on) => {
-    await startSession($, on, { windows: [FIVE, WEEK] })
+    await startSession($, on, { windows: [FIVE, WEEK], plan: 'claude_pro' })
     const terminal = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await terminal.find({ key: 'deskbar' })).toBeUndefined()
     await terminal.unmount()
 
     const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
     expect(await band.find({ key: 'deskbar' })).toMatchObject({ props: { flexWrap: 'wrap' } })
-    expect(await band.find({ type: 'Text', text: 'Subscription' })).toBeDefined()
+    expect(await band.find({ type: 'Text', text: 'Pro' })).toBeDefined()
     expect(await band.find({ type: 'Text', text: 'Sonnet 5.5' })).toBeDefined()
     expect(await band.find({ type: 'Text', text: 'medium' })).toBeDefined()
     expect(await band.find({ type: 'Text', text: ' 30%' })).toBeDefined()
@@ -121,7 +128,6 @@ describe('deskbar', () => {
     expect(await band.find({ type: 'Text', text: ' ↻ 2h 10m' })).toBeDefined()
     expect(await band.find({ type: 'Text', text: '85%' })).toMatchObject({ props: { color: levelColor(85) } })
     expect(await band.find({ type: 'Text', text: ' ↻ 3d 4h' })).toBeDefined()
-    expect(await band.find({ type: 'Text', text: /^cost/ })).toBeUndefined()
     await band.unmount()
   })
 
@@ -138,16 +144,25 @@ describe('deskbar', () => {
     await band.unmount()
   })
 
-  test('with no rate limits it is an API key: plan API and the cost, after a reply', async ($, on) => {
-    await startSession($, on)
-    const before = await $.ui.mount({ ...BAND, surface: 'desktop' })
-    expect(await before.find({ type: 'Text', text: 'API' })).toBeUndefined()
-    await before.unmount()
-    await respond($)
-    await $.session.measure({ context: { window: 1_000_000, percent: 5 }, rateLimits: [], cost: { usd: 1.239 }, changed: ['cost'] })
+  test('the plan is the login record\'s, Subscription while it can\'t be read, and nothing without usage limits', async ($, on) => {
+    await startSession($, on, { windows: [FIVE], plan: 'claude_enterprise' })
+    const enterprise = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    expect(await enterprise.find({ type: 'Text', text: 'Enterprise' })).toBeDefined()
+    expect(await enterprise.find({ type: 'Text', text: 'API' })).toBeUndefined()
+    await enterprise.unmount()
+  })
+
+  test('with no readable plan, Subscription shows once usage limits do', async ($, on) => {
+    await startSession($, on, { windows: [FIVE] })
     const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-    expect(await band.find({ type: 'Text', text: 'API' })).toBeDefined()
-    expect(await band.find({ type: 'Text', text: '$1.24' })).toBeDefined()
+    expect(await band.find({ type: 'Text', text: 'Subscription' })).toBeDefined()
+    await band.unmount()
+  })
+
+  test('with neither a plan nor usage limits there is no plan label', async ($, on) => {
+    await startSession($, on)
+    const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    expect(await band.find({ type: 'Text', text: /Subscription|API/ })).toBeUndefined()
     await band.unmount()
   })
 

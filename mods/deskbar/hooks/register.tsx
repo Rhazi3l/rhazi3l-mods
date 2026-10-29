@@ -9,16 +9,16 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { DeskbarChat, DeskbarUsage } from '../types'
 import { PASTEL } from './palette'
-import { barCells, cacheLeftMs, formatTokens, levelColor, prettyModel, untilTime } from './text'
+import { barCells, cacheLeftMs, formatTokens, levelColor, planName, prettyModel, untilTime } from './text'
 
-const EMPTY_USAGE: DeskbarUsage = { contextPercent: null, windows: [], costUsd: null }
+const EMPTY_USAGE: DeskbarUsage = { contextPercent: null, windows: [] }
 const EMPTY_CHAT: DeskbarChat = {
   model: '',
   effort: null,
   lastAt: null,
   contextTokens: 0,
   freshTokens: null,
-  hasReplied: false,
+  plan: null,
 }
 
 const isOnAtom = atom({ plugin: 'deskbar', key: 'isOn' } as const, true)
@@ -46,14 +46,27 @@ async function remember($: EngineInterface, sessionId: string, entry: Stored[str
 /** The context fill, usage windows and cost the engine has now. */
 async function readUsage($: EngineInterface) {
   try {
-    const { context, rateLimits, cost } = await $.session.usage()
+    const { context, rateLimits } = await $.session.usage()
     await update($, usageAtom, () => ({
       contextPercent: context.percent ?? null,
       windows: rateLimits.map(({ kind, percentUsed, resetsAt }) => ({ kind, percentUsed, resetsAt })),
-      costUsd: cost?.usd ?? null,
     }))
   } catch {
     // No session to read (a headless host): the band fills in when a measurement arrives.
+  }
+}
+
+/** The plan the person's login record names, read from the same config file the login keeps (`organizationType`). */
+async function readPlan($: EngineInterface) {
+  try {
+    const dir = await $.env.get('CLAUDE_CONFIG_DIR')
+    const home = dir ?? (await $.env.get('HOME'))
+    if (!home) return
+    const account = JSON.parse(await $.fs.read(`${home}/.claude.json`)).oauthAccount
+    const plan = planName(account?.organizationType)
+    await update($, chatAtom, now => ({ ...now, plan }))
+  } catch {
+    // The file can't be read: the band says Subscription while usage limits show, and nothing before.
   }
 }
 
@@ -88,6 +101,7 @@ export const register: Register = on => {
 
     const started = await next(e)
     await readUsage($)
+    await readPlan($)
     try {
       const model = await $.session.model()
       const effort = (await $.settings.read()).effortLevel
@@ -125,7 +139,6 @@ export const register: Register = on => {
     await update($, usageAtom, () => ({
       contextPercent: e.context.percent ?? null,
       windows: e.rateLimits.map(({ kind, percentUsed, resetsAt }) => ({ kind, percentUsed, resetsAt })),
-      costUsd: e.cost?.usd ?? null,
     }))
     return next(e)
   })
@@ -149,7 +162,6 @@ export const register: Register = on => {
         lastAt: at,
         contextTokens: tokens,
         freshTokens: isFirst ? tokens : now.freshTokens,
-        hasReplied: true,
       }))
       try {
         await remember($, await $.session.id(), { at, tokens, first: chat.freshTokens ?? undefined })
@@ -162,7 +174,7 @@ export const register: Register = on => {
 
   // A /clear starts a chat with an empty cache.
   on('session.end', async ($, e, next) => {
-    if (e.reason === 'clear') await update($, chatAtom, now => ({ ...EMPTY_CHAT, model: now.model, effort: now.effort }))
+    if (e.reason === 'clear') await update($, chatAtom, now => ({ ...EMPTY_CHAT, model: now.model, effort: now.effort, plan: now.plan }))
     return next(e)
   })
 
@@ -180,7 +192,8 @@ export const register: Register = on => {
 
     const five = usage.windows.find(w => w.kind === 'five_hour')
     const week = usage.windows.find(w => w.kind === 'seven_day')
-    const isSubscription = usage.windows.length > 0
+    // The plan from the login record; before it is known, Subscription once usage limits show.
+    const plan = chat.plan ?? (usage.windows.length > 0 ? 'Subscription' : null)
     const leftMs = cacheLeftMs(chat.lastAt, now)
     const isWarm = leftMs > 0
 
@@ -210,10 +223,10 @@ export const register: Register = on => {
       <Box flexDirection="column">
         {below}
         <Box key="deskbar" flexDirection="row" flexWrap="wrap">
-          {(isSubscription || chat.hasReplied) &&
+          {plan !== null &&
             part('plan', [
-              <Text key="dot" color={isSubscription ? PASTEL.done : PASTEL.waiting}>{'◆ '}</Text>,
-              <Text key="name">{isSubscription ? 'Subscription' : 'API'}</Text>,
+              <Text key="dot" color={PASTEL.done}>{'◆ '}</Text>,
+              <Text key="name">{plan}</Text>,
             ])}
           {chat.model !== '' &&
             part('model', [
@@ -249,12 +262,6 @@ export const register: Register = on => {
           ])}
           {five && windowPart('five', '5h', five)}
           {week && windowPart('week', 'week', week)}
-          {/* Cost only means money on the API; a subscription's figure is notional. */}
-          {!isSubscription && chat.hasReplied && usage.costUsd !== null &&
-            part('cost', [
-              <Text key="label" dimColor>{'cost '}</Text>,
-              <Text key="usd">{`$${usage.costUsd.toFixed(2)}`}</Text>,
-            ])}
         </Box>
       </Box>
     )

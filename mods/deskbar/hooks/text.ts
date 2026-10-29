@@ -21,6 +21,13 @@ export function prettyModel(model: string): string {
   return minor ? `${name} ${major}.${minor}` : `${name} ${major}`
 }
 
+/** `claude_pro` → `Pro`, `claude_enterprise` → `Enterprise`; the plan as the login record names it, or null. */
+export function planName(type: unknown): string | null {
+  if (typeof type !== 'string') return null
+  const words = type.replace(/^claude_/, '').split('_').filter(word => word !== '')
+  return words.length === 0 ? null : words.map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+}
+
 /** Time left as `3d 4h`, `2h 10m` or `45m`. */
 export function untilTime(ms: number): string {
   const minutes = Math.floor(Math.max(0, ms) / 60_000)

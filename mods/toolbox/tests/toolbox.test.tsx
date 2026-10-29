@@ -166,6 +166,7 @@ describe('toolbox', () => {
     const listed = await $.command.run({ command: 'mods', args: '', ...RUN })
     expect(listed.text).toContain('/plugin install clean-view')
     expect(listed.text).toContain('/plugin install prompt-upgrade')
+    expect(listed.text).toContain('/plugin install deskbar')
   })
 
   test('with Clean View installed, its button runs /view off and on', async ($, on) => {
@@ -253,5 +254,25 @@ describe('toolbox', () => {
     await band.press({ key: 'mod-prompt-upgrade' })
     expect(ran).toContain('better off')
     await band.unmount()
+  })
+
+  test('with Deskbar installed, its button runs /deskbar off', async ($, on) => {
+    const ran: string[] = []
+    fakeMod(on, ran, [{ id: 'deskbar', command: 'deskbar' }])
+    on('ui.toast', () => ({ value: undefined }) as never)
+    await startSession($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
+    for (const surface of SURFACES) {
+      const band = await $.ui.mount({ ...BAND, surface })
+      expect(await band.find({ key: 'mod-deskbar' })).toMatchObject({ text: '● Deskbar' })
+      expect(await band.find({ key: 'mod-clean-view' })).toBeUndefined()
+      await band.unmount()
+    }
+    const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await band.press({ key: 'mod-deskbar' })
+    expect(ran).toEqual(['deskbar off'])
+    await band.unmount()
+    const listed = await $.command.run({ command: 'mods', args: '', ...RUN })
+    expect(listed.text).toContain('**Deskbar**')
   })
 })

@@ -29,5 +29,9 @@ declare module 'claude-code' {
     'prompt-upgrade': {
       isOn: boolean
     }
+    /** Read only, as above: owned and written by the Deskbar mod. */
+    deskbar: {
+      isOn: boolean
+    }
   }
 }

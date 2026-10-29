@@ -19,7 +19,7 @@ const EMPTY_ADVISOR: AdvisorInfo = { model: null }
 const advisorInfoAtom = atom({ plugin: 'toolbox', key: 'advisorInfo' } as const, EMPTY_ADVISOR)
 
 const LABEL_WIDTH = 8
-const INSTALL_HINT = 'Clean View: `/plugin install clean-view --marketplace Rhazi3l/rhazi3l-mods`, Better: `/plugin install prompt-upgrade --marketplace Rhazi3l/rhazi3l-mods`'
+const INSTALL_HINT = 'Clean View: `/plugin install clean-view --marketplace Rhazi3l/rhazi3l-mods`, Better: `/plugin install prompt-upgrade --marketplace Rhazi3l/rhazi3l-mods`, Deskbar: `/plugin install deskbar --marketplace Rhazi3l/rhazi3l-mods`'
 
 /** A sibling mod the toolbox can switch: it owns its on/off value and a command that takes `on` and `off`. */
 type SiblingMod = { id: string; name: string; command: string; description: string }
@@ -38,16 +38,25 @@ const PROMPT_UPGRADE: SiblingMod = {
   description: 'A ✦ Better button beside Info that rewrites the prompt you typed; nothing is sent until you press Run it',
 }
 
-const SIBLINGS = [CLEAN_VIEW, PROMPT_UPGRADE]
+const DESKBAR: SiblingMod = {
+  id: 'deskbar',
+  name: 'Deskbar',
+  command: 'deskbar',
+  description: 'A band above the prompt in the desktop app with the plan, model, effort, context, prompt cache and 5h and weekly usage',
+}
+
+const SIBLINGS = [CLEAN_VIEW, PROMPT_UPGRADE, DESKBAR]
 
 /** Each sibling mod with its on/off, or undefined while it isn't installed. */
 async function siblingStates($: EngineInterface): Promise<{ mod: SiblingMod; isOn: boolean | undefined }[]> {
   // Each mod writes its own value; the toolbox only reads them.
   const { value: cleanViewOn } = await $.state.get({ plugin: 'clean-view', key: 'isOn' } as const)
   const { value: promptUpgradeOn } = await $.state.get({ plugin: 'prompt-upgrade', key: 'isOn' } as const)
+  const { value: deskbarOn } = await $.state.get({ plugin: 'deskbar', key: 'isOn' } as const)
   return [
     { mod: CLEAN_VIEW, isOn: cleanViewOn },
     { mod: PROMPT_UPGRADE, isOn: promptUpgradeOn },
+    { mod: DESKBAR, isOn: deskbarOn },
   ]
 }
 
