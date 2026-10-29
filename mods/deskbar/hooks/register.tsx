@@ -260,6 +260,8 @@ export const register: Register = on => {
               bar(usage.contextPercent),
               <Text key="pct" bold color={levelColor(usage.contextPercent)}>{` ${Math.floor(usage.contextPercent)}%`}</Text>,
             ])}
+          {five && windowPart('five', '5h', five)}
+          {week && windowPart('week', 'week', week)}
           {part('cache', [
             <Text key="label" dimColor>{'cache '}</Text>,
             chat.lastAt === null ? (
@@ -276,8 +278,6 @@ export const register: Register = on => {
               </Text>
             ),
           ])}
-          {five && windowPart('five', '5h', five)}
-          {week && windowPart('week', 'week', week)}
         </Box>
       </Box>
     )

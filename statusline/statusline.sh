@@ -142,8 +142,6 @@ parts+=("$(fg "$BLUE")◆$RESET $BOLD$(fg "$TEXT")$model$RESET")
 if [[ -n $ctx ]]; then
   parts+=("$(fg "$DIM")ctx$RESET $(bar "$ctx") $BOLD$(fg "$(level "$ctx")")${ctx%.*}%$RESET")
 fi
-cache=$(cache_part)
-[[ -n $cache ]] && parts+=("$(fg "$DIM")cache$RESET $cache")
 if [[ -n $five ]]; then
   reset=""
   [[ -n $five_at ]] && reset=" $(fg "$DIM")↻ $(until_time "${five_at%.*}")$RESET"
@@ -154,6 +152,9 @@ if [[ -n $week ]]; then
   [[ -n $week_at ]] && reset=" $(fg "$DIM")↻ $(until_time "${week_at%.*}")$RESET"
   parts+=("$(fg "$DIM")week$RESET $BOLD$(fg "$(level "$week")")${week%.*}%$RESET$reset")
 fi
+cache=$(cache_part)
+[[ -n $cache ]] && parts+=("$(fg "$DIM")cache$RESET $cache")
+
 line=""
 for part in "${parts[@]}"; do
   [[ -n $line ]] && line+=$SEP

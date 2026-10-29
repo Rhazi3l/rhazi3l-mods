@@ -131,6 +131,16 @@ describe('deskbar', () => {
     await band.unmount()
   })
 
+  test('the cache is the last figure on the row, after the weekly usage', async ($, on) => {
+    await startSession($, on, { windows: [FIVE, WEEK], plan: 'claude_pro' })
+    const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    const tree = JSON.stringify(await band.find({ key: 'deskbar' }))
+    const at = ['"plan"', '"model"', '"context"', '"five"', '"week"', '"cache"'].map(key => tree.indexOf(key))
+    expect(at.every(i => i > -1)).toBe(true)
+    expect([...at].sort((a, b) => a - b)).toEqual(at)
+    await band.unmount()
+  })
+
   test('a measurement redraws the usage windows', async ($, on) => {
     await startSession($, on, { windows: [FIVE] })
     await $.session.measure({
