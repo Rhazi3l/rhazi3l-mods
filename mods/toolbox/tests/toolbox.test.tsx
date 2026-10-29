@@ -2,6 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine, MockClock } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+import { PASTEL } from '../hooks/palette'
 import { capitalise, modelAlias, prettyModel } from '../hooks/text'
 
 const NOW = Date.parse('2026-10-14T10:00:00Z')
@@ -143,6 +144,24 @@ describe('toolbox', () => {
     }
   })
 
+  test('the Info button carries the context figure, dim until 80% then amber and red', async ($, on) => {
+    on('session.measure', (_$, e) => ({ changed: e.changed }) as never)
+    await startSession($, on)
+    for (const surface of SURFACES) {
+      const before = await $.ui.mount({ ...FOOTER, surface })
+      expect(await before.find({ type: 'Text', text: / \d+%/ })).toBeUndefined()
+      await before.unmount()
+    }
+    for (const [percent, color] of [[20, undefined], [85, PASTEL.stuck], [96, PASTEL.error]] as const) {
+      await $.session.measure({ context: { window: 1_000_000, percent }, rateLimits: [], changed: ['context'] })
+      const footer = await $.ui.mount({ ...FOOTER, surface: 'desktop' })
+      const figure = await footer.find({ type: 'Text', text: ` ${percent}%` })
+      expect(figure).toBeDefined()
+      expect(figure?.props.color).toBe(color)
+      await footer.unmount()
+    }
+  })
+
   test('rows are laid out by boxes, so the desktop app wraps them rather than overlapping', async ($, on) => {
     await startSession($, on)
     await $.command.run({ command: 'toolbox', args: '', ...RUN })
@@ -185,7 +204,7 @@ describe('toolbox', () => {
     await terminal.unmount()
   })
 
-  test('with no other mods installed, there is no Mods row and /mods says how to add one', async ($, on) => {
+  test('with no other mods installed, there is no Mods row', async ($, on) => {
     await startSession($, on)
     await $.command.run({ command: 'toolbox', args: '', ...RUN })
     for (const surface of SURFACES) {
@@ -193,10 +212,6 @@ describe('toolbox', () => {
       expect(await band.find({ key: 'toolbox-mods' })).toBeUndefined()
       await band.unmount()
     }
-    const listed = await $.command.run({ command: 'mods', args: '', ...RUN })
-    expect(listed.text).toContain('/plugin install clean-view')
-    expect(listed.text).toContain('/plugin install prompt-upgrade')
-    expect(listed.text).toContain('/plugin install deskbar')
   })
 
   test('with Clean View installed, its button runs /view off and on', async ($, on) => {
@@ -223,14 +238,6 @@ describe('toolbox', () => {
     expect(viewed).toEqual(['view off', 'view on'])
     expect(toasts).toEqual(['Clean View is off.', 'Clean View is on.'])
     await after.unmount()
-
-    const listed = await $.command.run({ command: 'mods', args: '', ...RUN })
-    expect(listed.text).toContain('● **Clean View**')
-    const turnedOff = await $.command.run({ command: 'mods', args: 'clean view off', ...RUN })
-    expect(turnedOff.text).toBe('Switching Clean View off.')
-    await clock.advance(1)
-    expect(viewed).toEqual(['view off', 'view on', 'view off'])
-    expect(toasts).toContain('Clean View is off.')
   })
 
   test('the footer draws the modes once and other mods\' buttons to the left of the Info button', async ($, on) => {
@@ -302,8 +309,6 @@ describe('toolbox', () => {
     await band.press({ key: 'mod-deskbar' })
     expect(ran).toEqual(['deskbar off'])
     await band.unmount()
-    const listed = await $.command.run({ command: 'mods', args: '', ...RUN })
-    expect(listed.text).toContain('**Deskbar**')
   })
 
   test('a mod whose state can\'t be read does not take the Mods row down with it', async ($, on) => {

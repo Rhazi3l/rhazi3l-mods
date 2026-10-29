@@ -1,5 +1,7 @@
 // Plain words for the toolbox: model names and the choices it offers.
 
+import { PASTEL } from './palette'
+
 /** Model aliases the toolbox offers, as /model takes them, cheapest per token on the left (Haiku, Sonnet, Opus, Fable). */
 export const MODELS = ['haiku', 'sonnet', 'opus', 'fable'] as const
 
@@ -28,4 +30,9 @@ export const ADVISORS = MODELS
 /** `max` → `Max`: the first letter in capitals, to match the model names. */
 export function capitalise(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1)
+}
+
+/** The context figure's colour once it matters: amber from 80%, red from 95%. */
+export function contextColor(percent: number): string {
+  return percent >= 95 ? PASTEL.error : PASTEL.stuck
 }

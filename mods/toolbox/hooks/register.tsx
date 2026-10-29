@@ -1,15 +1,15 @@
 // Info: a "✦ Info ▾" button at the right of the prompt footer that
 // opens a small panel in the corner above it for the model, effort, the advisor
-// and the other mods that are installed. Usage figures and the prompt cache's
-// warm or cold belong in Claude Code's own status line setting, not here.
-// Colours are theme keys, so they follow Claude Code's theme (custom:omarchy).
+// and the other mods that are installed. The button also carries how full the context is.
+// Usage figures and the prompt cache belong in Claude Code's own status line setting, not here.
+// Colours are the mods' shared palette (palette.ts).
 
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
 import type { AdvisorInfo, ToolboxInfo } from '../types'
 import { PASTEL } from './palette'
-import { ADVISORS, EFFORTS, MODELS, capitalise, modelAlias, prettyModel } from './text'
+import { ADVISORS, EFFORTS, MODELS, capitalise, contextColor, modelAlias, prettyModel } from './text'
 
 const toolboxOpenAtom = atom({ plugin: 'toolbox', key: 'toolboxOpen' } as const, false)
 const EMPTY_INFO: ToolboxInfo = { model: '', effort: null }
@@ -18,9 +18,9 @@ const toolboxInfoAtom = atom({ plugin: 'toolbox', key: 'toolboxInfo' } as const,
 const EMPTY_ADVISOR: AdvisorInfo = { model: null }
 const advisorInfoAtom = atom({ plugin: 'toolbox', key: 'advisorInfo' } as const, EMPTY_ADVISOR)
 
-const LABEL_WIDTH = 8
-const INSTALL_HINT = 'Clean View: `/plugin install clean-view --marketplace Rhazi3l/rhazi3l-mods`, Better: `/plugin install prompt-upgrade --marketplace Rhazi3l/rhazi3l-mods`, Deskbar: `/plugin install deskbar --marketplace Rhazi3l/rhazi3l-mods`'
+const contextAtom = atom({ plugin: 'toolbox', key: 'contextPercent' } as const, null as number | null)
 
+const LABEL_WIDTH = 8
 /** A sibling mod the toolbox can switch: it owns its on/off value and a command that takes `on` and `off`. */
 type SiblingMod = { id: string; name: string; command: string; description: string }
 
@@ -44,8 +44,6 @@ const DESKBAR: SiblingMod = {
   command: 'deskbar',
   description: 'A band above the prompt in the desktop app with the plan, context, 5h and weekly usage and prompt cache',
 }
-
-const SIBLINGS = [CLEAN_VIEW, PROMPT_UPGRADE, DESKBAR]
 
 /** Each sibling mod with its on/off, or undefined while it isn't installed. */
 async function siblingStates($: EngineInterface): Promise<{ mod: SiblingMod; isOn: boolean | undefined }[]> {
@@ -75,11 +73,6 @@ async function switchMod($: EngineInterface, mod: SiblingMod, isOn: boolean): Pr
   }
 }
 
-function findMod(query: string): SiblingMod | undefined {
-  const wanted = query.trim().toLowerCase().replace(/[\s_]+/g, '-')
-  return SIBLINGS.find(mod => mod.id === wanted || mod.name.toLowerCase().replace(/\s+/g, '-') === wanted)
-}
-
 async function readAdvisor($: EngineInterface) {
   try {
     const model = await $.settings.read({ key: 'advisorModel' })
@@ -93,14 +86,8 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     try {
       await $.command.register({
-        name: 'mods',
-        description: 'List your mods, or switch one on or off',
-        argumentHint: '[mod] [on|off]',
-        immediate: true,
-      })
-      await $.command.register({
         name: 'toolbox',
-        description: 'Open or close the Info panel: model, effort and mods',
+        description: 'Open or close the Info panel: model, effort, advisor and mods',
         immediate: true,
       })
     } catch {
@@ -109,6 +96,12 @@ export const register: Register = on => {
 
     const started = await next(e)
     await readAdvisor($)
+    try {
+      const { context } = await $.session.usage()
+      await update($, contextAtom, () => context.percent ?? null)
+    } catch {
+      // No session to read (a headless host): the figure shows once a measurement arrives.
+    }
     try {
       const model = await $.session.model()
       const saved = (await $.settings.read()).effortLevel
@@ -135,35 +128,22 @@ export const register: Register = on => {
     return yield* next(e)
   })
 
+  // How full the context window is, for the figure beside the Info button.
+  on('session.measure', async ($, e, next) => {
+    await update($, contextAtom, () => e.context.percent ?? null)
+    return next(e)
+  })
+
   on('command.run', { command: 'toolbox' }, async $ => {
     const isOpen = await update($, toolboxOpenAtom, open => !open)
     return { text: isOpen ? 'Info open above the prompt.' : 'Info closed.' }
-  })
-
-  on('command.run', { command: 'mods' }, async ($, e) => {
-    const installed = await installedMods($)
-    if (installed.length === 0) {
-      return { text: `No mods are installed yet. To add one: ${INSTALL_HINT}` }
-    }
-    const args = e.args.trim()
-    if (args === '') {
-      const lines = installed.map(({ mod, isOn }) => `- ${isOn ? '●' : '○'} **${mod.name}**: ${mod.description}`)
-      return { text: `Your mods:\n${lines.join('\n')}\n\nUse /mods <name> on or /mods <name> off.` }
-    }
-    const [, name = args, wanted] = /^(.*?)\s+(on|off)$/i.exec(args) ?? []
-    const mod = findMod(name)
-    const found = mod && installed.find(s => s.mod.id === mod.id)
-    if (!found) return { text: `No mod called "${args}". Type /mods to see them.` }
-    const isOn = wanted ? wanted.toLowerCase() === 'on' : !found.isOn
-    // A command can't run another while it answers, so the switch runs just after.
-    $.clock.after(0, async () => $.ui.toast(await switchMod($, found.mod, isOn)))
-    return { text: `Switching ${found.mod.name} ${isOn ? 'on' : 'off'}.` }
   })
 
   // The footer button, beside the engine's own mode labels.
   on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const isOpen = await read($, toolboxOpenAtom)
+    const context = await read($, contextAtom)
     const modes = e.props.modes.join(' & ')
     // The desktop footer has little room, so there the chevron is dropped.
     const isTerminal = e.surface === 'terminal'
@@ -185,6 +165,9 @@ export const register: Register = on => {
             <Text color={isOpen ? PASTEL.working : 'text'} bold={isOpen}>
               Info
             </Text>
+            {context !== null && (
+              <Text dimColor={context < 80} color={context < 80 ? undefined : contextColor(context)}>{` ${Math.floor(context)}%`}</Text>
+            )}
             {isTerminal && <Text color={isOpen ? PASTEL.working : PASTEL.stopped}>{isOpen ? ' ▴' : ' ▾'}</Text>}
           </Button>
         </Box>
@@ -246,60 +229,60 @@ export const register: Register = on => {
           gap={isTerminal ? undefined : 'xs'}
         >
           {showsModelAndEffort && (
-          <Box key="toolbox-model" flexDirection="row">
-            {label('Model')}
-            {buttons([
-              ...MODELS.map(alias => (
+            <Box key="toolbox-model" flexDirection="row">
+              {label('Model')}
+              {buttons([
+                ...MODELS.map(alias => (
+                  <Button
+                    key={`model-${alias}`}
+                    label={prettyModel(alias)}
+                    variant={alias === currentModel ? 'primary' : 'secondary'}
+                    onPress={async () => {
+                      try {
+                        await $.command.run({ command: 'model', args: alias })
+                        const model = await $.session.model()
+                        await update($, toolboxInfoAtom, now => ({ ...now, model }))
+                      } catch {
+                        $.ui.toast(`Couldn't switch to ${prettyModel(alias)}.`)
+                      }
+                    }}
+                  />
+                )),
                 <Button
-                  key={`model-${alias}`}
-                  label={prettyModel(alias)}
-                  variant={alias === currentModel ? 'primary' : 'secondary'}
+                  key="model-more"
+                  label="More…"
                   onPress={async () => {
                     try {
-                      await $.command.run({ command: 'model', args: alias })
-                      const model = await $.session.model()
-                      await update($, toolboxInfoAtom, now => ({ ...now, model }))
+                      await $.command.run({ command: 'model' })
                     } catch {
-                      $.ui.toast(`Couldn't switch to ${prettyModel(alias)}.`)
+                      $.ui.toast("Couldn't open the model picker.")
                     }
                   }}
-                />
-              )),
-              <Button
-                key="model-more"
-                label="More…"
-                onPress={async () => {
-                  try {
-                    await $.command.run({ command: 'model' })
-                  } catch {
-                    $.ui.toast("Couldn't open the model picker.")
-                  }
-                }}
-              />,
-            ])}
-          </Box>
+                />,
+              ])}
+            </Box>
           )}
           {showsModelAndEffort && (
-          <Box key="toolbox-effort" flexDirection="row">
-            {label('Effort')}
-            {buttons(
-              EFFORTS.map(level => (
-                <Button
-                  key={`effort-${level}`}
-                  label={capitalise(level)}
-                  variant={level === info.effort ? 'primary' : 'secondary'}
-                  onPress={async () => {
-                    try {
-                      await $.command.run({ command: 'effort', args: level })
-                      await update($, toolboxInfoAtom, now => ({ ...now, effort: level }))
-                    } catch {
-                      $.ui.toast(`Couldn't set effort to ${level}.`)
-                    }
-                  }}
-                />
-              )),
-            )}
-          </Box>
+            <Box key="toolbox-effort" flexDirection="row">
+              {label('Effort')}
+              {buttons(
+                EFFORTS.map(level => (
+                  <Button
+                    key={`effort-${level}`}
+                    label={capitalise(level)}
+                    variant={level === info.effort ? 'primary' : 'secondary'}
+                    onPress={async () => {
+                      try {
+                        await $.command.run({ command: 'effort', args: level })
+                        await update($, toolboxInfoAtom, now => ({ ...now, effort: level }))
+                      } catch {
+                        $.ui.toast(`Couldn't set effort to ${level}.`)
+                      }
+                    }}
+                  />
+                )),
+              )}
+            </Box>
           )}
           <Box key="toolbox-advisor" flexDirection="row">
             {label('Advisor')}

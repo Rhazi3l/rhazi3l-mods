@@ -17,6 +17,8 @@ declare module 'claude-code' {
       toolboxOpen: boolean
       toolboxInfo: ToolboxInfo
       advisorInfo: AdvisorInfo
+      /** How full the context window is, 0 to 100; null before a measurement. */
+      contextPercent: number | null
     }
     /**
      * Read only: owned and written by the Clean View mod. Undefined means it
