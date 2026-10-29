@@ -8,7 +8,7 @@ import { PASTEL } from './palette'
  * cache on a subscription and the five-minute one on pay-as-you-go keys, and does not say which a
  * request got, so the band assumes one hour (as the status line does).
  */
-export const CACHE_TTL_MS = 60 * 60 * 1000
+const CACHE_TTL_MS = 60 * 60 * 1000
 
 /** `claude_pro` → `Pro`, `claude_enterprise` → `Enterprise`; the plan as the login record names it, or null. */
 export function planName(type: unknown): string | null {

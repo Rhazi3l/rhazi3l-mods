@@ -2,7 +2,7 @@
 
 import type { ModelCompleteRequest } from 'claude-code'
 
-export const MAX_PROMPT = 8000
+const MAX_PROMPT = 8000
 
 const SYSTEM = `You rewrite a person's rough prompt for an AI coding assistant into one clearer request.
 Rules:

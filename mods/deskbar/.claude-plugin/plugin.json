@@ -1,6 +1,6 @@
 {
   "name": "deskbar",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "A band above the prompt in the desktop app with the plan, context, 5h and weekly usage and the prompt cache, like the terminal status line.",
   "author": {
     "name": "Rhazi3l"
