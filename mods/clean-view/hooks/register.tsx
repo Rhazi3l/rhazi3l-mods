@@ -586,8 +586,16 @@ export const register: Register = on => {
         <Text bold color={PASTEL.working}>{'✱ Working…'}</Text>
         <Box flexDirection="row" flexShrink={1} marginLeft={1}>
           <Text dimColor wrap="truncate-end">{`· ${doing.icon} ${doing.detail || doing.label}`}</Text>
-          {doing.isFailed && <Text color={PASTEL.error}>{" · didn't work"}</Text>}
-          {doingCount > 1 && <Text dimColor>{` · ${doingCount} actions`}</Text>}
+          {doing.isFailed && (
+            <Box flexShrink={0}>
+              <Text color={PASTEL.error}>{" · didn't work"}</Text>
+            </Box>
+          )}
+          {doingCount > 1 && (
+            <Box flexShrink={0}>
+              <Text dimColor>{` · ${doingCount} actions`}</Text>
+            </Box>
+          )}
         </Box>
       </Box>
     ) : (
@@ -722,8 +730,16 @@ export const register: Register = on => {
             {hasTrail && latest && (
               <Box key="clean-view-trail" flexDirection="row" flexShrink={1} marginLeft={1}>
                 <Text dimColor wrap="truncate-end">{`· ${trailText}`}</Text>
-                {latest.isFailed && <Text color={PASTEL.error}>{" · didn't work"}</Text>}
-                {count > 1 && <Text dimColor>{` · ${count} actions`}</Text>}
+                {latest.isFailed && (
+                  <Box flexShrink={0}>
+                    <Text color={PASTEL.error}>{" · didn't work"}</Text>
+                  </Box>
+                )}
+                {count > 1 && (
+                  <Box flexShrink={0}>
+                    <Text dimColor>{` · ${count} actions`}</Text>
+                  </Box>
+                )}
               </Box>
             )}
           </Box>
