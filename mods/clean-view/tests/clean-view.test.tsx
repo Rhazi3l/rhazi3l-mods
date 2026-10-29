@@ -146,7 +146,7 @@ describe('checklist', () => {
       expect(await ui.find({ type: 'Text', text: /^Next$/ })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: 'Up next' })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /▶/ })).toBeDefined()
-      expect(await ui.find({ key: 'clean-view-style' })).toBeDefined()
+      expect(await ui.find({ key: 'clean-view-style' })).toBeUndefined()
       expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.working } })
       // No overall Step x of y bar: the steps are the progress.
       expect(await ui.find({ key: 'clean-view-overall' })).toBeUndefined()
@@ -208,23 +208,20 @@ describe('checklist', () => {
     expect(after.isError).toBeUndefined()
   })
 
-  test('tool rows stay out of the transcript in Guided and Simple', async ($, on) => {
+  test('tool rows stay out of the transcript', async ($, on) => {
     on('ui.render', { component: 'ToolUse' }, ($, e) => {
       const { Text } = $.ui.resolve(e)
       return <Text>engine row</Text>
     })
     await startJob($, on)
-    for (const style of ['guided', 'simple']) {
-      await $.command.run({ command: 'view', args: style, ...RUN })
-      for (const surface of SURFACES) {
-        const ui = await $.ui.mount({ ...ROW, surface })
-        expect(await ui.find({ type: 'Text' })).toBeUndefined()
-        await ui.unmount()
-      }
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ ...ROW, surface })
+      expect(await ui.find({ type: 'Text' })).toBeUndefined()
+      await ui.unmount()
     }
   })
 
-  test('Guided shows the latest action under the step in progress', async ($, on) => {
+  test('the latest action shows on the step in progress', async ($, on) => {
     await startJob($, on)
     await $.tool.call({ tool: PLAN, steps: ['Read your notes', 'Write the page'] } as never)
     await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/brand.md' })
@@ -235,10 +232,9 @@ describe('checklist', () => {
       expect(await ui.find({ key: 'clean-view-details' })).toBeDefined()
       await ui.unmount()
     }
-    await $.command.run({ command: 'view', args: 'simple', ...RUN })
-    const simple = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await simple.find({ key: 'clean-view-trail' })).toBeUndefined()
-    await simple.unmount()
+    // The old Simple and Guided picks are gone: /view says what is left.
+    const gone = await $.command.run({ command: 'view', args: 'simple', ...RUN })
+    expect(JSON.stringify(gone)).toContain('/view details')
   })
 
   test('Details lists every step and action in full, and can bring the tool rows back', async ($, on) => {

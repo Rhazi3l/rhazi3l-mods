@@ -1,8 +1,5 @@
-/** The view the person picked for Clean View: Simple shows the checklist alone, Guided adds the latest action. */
-export type CleanViewStyle = 'simple' | 'guided'
-
-/** The view in force: the picked style, or `full` while Clean View is switched off. */
-export type ViewMode = CleanViewStyle | 'full'
+/** The view in force: `guided` (the checklist and the latest action), or `full` while Clean View is switched off. */
+export type ViewMode = 'guided' | 'full'
 
 export type TaskStatus = 'done' | 'active' | 'upcoming'
 
@@ -59,8 +56,6 @@ declare module 'claude-code' {
     'clean-view': {
       /** Whether Clean View is on. Other mods (the toolbox) read it; only Clean View writes it. */
       isOn: boolean
-      /** The view the person picked. */
-      style: CleanViewStyle
       checklist: Checklist
       tick: number
       /** True while the Details pane has asked for the engine's own tool rows in the transcript. */

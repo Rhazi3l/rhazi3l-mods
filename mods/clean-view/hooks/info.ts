@@ -35,8 +35,8 @@ export const TOOLS: readonly ToolSpec[] = [
 export const COMMANDS: readonly CommandSpec[] = [
   {
     name: 'view',
-    description: 'Clean View: Simple or Guided, Details for everything Claude did, or on and off',
-    argumentHint: '[simple|guided|details|colours|on|off]',
+    description: 'Clean View: Details for everything Claude did, the colour legend, or on and off',
+    argumentHint: '[details|colours|on|off]',
     immediate: true,
   },
 ]

@@ -1,15 +1,14 @@
 // Clean View: a calm checklist above the prompt in place of the technical
 // tool rows, which it hides from the transcript.
 //
-// Views: Simple shows the checklist alone, Guided adds the latest action on
-// the step in progress. The Details pane lists every step and every action of
+// The checklist always shows the latest action on the step in progress. The Details pane lists every step and every action of
 // the job in full, and can bring the engine's own tool rows back. Full (Clean
 // View off) leaves Claude Code as it is.
 
 import { atom, derive, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
 
-import type { Checklist, ChecklistAction, ChecklistTask, CleanViewStyle, ViewMode } from '../types'
+import type { Checklist, ChecklistAction, ChecklistTask, ViewMode } from '../types'
 import { COMMANDS, TOOLS } from './info'
 import { PASTEL } from './palette'
 import {
@@ -67,19 +66,17 @@ const EMPTY: Checklist = {
   actions: [],
 }
 
-// Values the drawings read (types/index.d.ts). `isOn` and `style` are saved in
-// $.store too, so they last past the session; the toolbox reads `isOn`.
+// Values the drawings read (types/index.d.ts). `isOn` is saved in $.store too, so it
+// lasts past the session; the toolbox reads it.
 const STORE_ON = 'isOn'
-const STORE_STYLE = 'style'
 const COLOURS_PANE = 'clean-view-colours'
 const isOnAtom = atom({ plugin: 'clean-view', key: 'isOn' } as const, true)
-const styleAtom = atom({ plugin: 'clean-view', key: 'style' } as const, 'guided')
 const checklistAtom = atom({ plugin: 'clean-view', key: 'checklist' } as const, EMPTY)
 const tickAtom = atom({ plugin: 'clean-view', key: 'tick' } as const, 0)
 const rawAtom = atom({ plugin: 'clean-view', key: 'showsRaw' } as const, false)
 
-/** The view in force: the picked style, or `full` while Clean View is off. */
-const modeAtom = derive([styleAtom, isOnAtom], (style, isOn): ViewMode => (isOn ? style : 'full'))
+/** The view in force: guided, or `full` while Clean View is off. */
+const modeAtom = derive([isOnAtom], (isOn): ViewMode => (isOn ? 'guided' : 'full'))
 
 /** Whether the transcript shows the engine's own tool rows: Clean View off, or Details asked for them. */
 const showsToolRowsAtom = derive([modeAtom, rawAtom], (mode, raw) => mode === 'full' || raw)
@@ -205,15 +202,6 @@ function stopTicker() {
   ticker = undefined
 }
 
-function styleToast(style: CleanViewStyle): string {
-  return style === 'simple'
-    ? 'Clean View: Simple. Only the checklist shows.'
-    : 'Clean View: Guided. The checklist plus what Claude is doing right now.'
-}
-
-const styleLabel = (style: CleanViewStyle) => (style === 'simple' ? 'View: Simple' : 'View: Guided')
-const nextStyle = (style: CleanViewStyle): CleanViewStyle => (style === 'simple' ? 'guided' : 'simple')
-
 const NAME_SYSTEM =
   'Name the job described in the request in 2 to 6 plain English words, starting with a verb, like "Build my landing page". No file names, code or punctuation. Answer with the name only.'
 
@@ -318,24 +306,20 @@ export function barSvg(cells: boolean[], litColor: string): string {
 
 /**
  * A /clear starts the session's values over and fires no session.start, so Clean View's on/off (which the
- * toolbox reads to show its button) and style are written again from what was saved.
+ * toolbox reads to show its button) is written again from what was saved.
  */
 async function restoreAfterClear($: EngineInterface) {
   const { value } = await $.state.get({ plugin: 'clean-view', key: 'isOn' } as const)
   if (value !== undefined) return
   const savedOn = await $.store.get(STORE_ON)
-  const savedStyle = await $.store.get(STORE_STYLE)
   await update($, isOnAtom, () => (typeof savedOn === 'boolean' ? savedOn : true))
-  await update($, styleAtom, (): CleanViewStyle => (savedStyle === 'simple' ? 'simple' : 'guided'))
 }
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const savedOn = await $.store.get(STORE_ON)
-    const savedStyle = await $.store.get(STORE_STYLE)
     // Written even when unchanged, so other mods can tell Clean View is installed.
     await update($, isOnAtom, () => (typeof savedOn === 'boolean' ? savedOn : true))
-    await update($, styleAtom, (): CleanViewStyle => (savedStyle === 'simple' ? 'simple' : 'guided'))
     try {
       for (const tool of TOOLS) await $.tool.register(tool)
       for (const command of COMMANDS) await $.command.register(command)
@@ -369,15 +353,7 @@ export const register: Register = on => {
       await $.store.set(STORE_ON, isOn)
       return { text: isOn ? 'Clean View is on.' : 'Clean View is off. Everything Claude does is shown in full.' }
     }
-    if (arg !== '' && arg !== 'simple' && arg !== 'guided') {
-      return {
-        text: 'Use /view simple, /view guided, /view details, /view colours, /view on or /view off. With nothing after it, /view switches between Simple and Guided.',
-      }
-    }
-    const style = arg === '' ? nextStyle(await read($, styleAtom)) : (arg as CleanViewStyle)
-    await update($, styleAtom, () => style)
-    await $.store.set(STORE_STYLE, style)
-    return { text: styleToast(style) }
+    return { text: 'Use /view details, /view colours, /view on or /view off.' }
   })
 
   on('prompt.submit', ($, e, next) => {
@@ -631,7 +607,6 @@ export const register: Register = on => {
     const { Box, Text, Button } = ui
     const tick = await read($, tickAtom)
     const now = await $.clock.now()
-    const style = await read($, styleAtom)
     // Inside the frame: its border and padding take four columns.
     const width = Math.max(20, e.props.bodyColumns - 4)
     // The terminal draws in even character cells, so bars and columns can be
@@ -649,16 +624,6 @@ export const register: Register = on => {
           label="Details"
           hotkey="d"
           onPress={() => $.ui.open({ id: DETAILS_PANE, title: DETAILS_TITLE })}
-        />
-        <Button
-          key="clean-view-style"
-          label={styleLabel(style)}
-          onPress={async () => {
-            const chosen = nextStyle(await read($, styleAtom))
-            await update($, styleAtom, () => chosen)
-            await $.store.set(STORE_STYLE, chosen)
-            $.ui.toast(styleToast(chosen))
-          }}
         />
       </Box>
     )
