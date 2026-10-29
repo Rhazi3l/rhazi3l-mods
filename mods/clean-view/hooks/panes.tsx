@@ -32,7 +32,31 @@ async function scrollDetails($: EngineInterface, where: { to: 'end' | { key: str
 }
 
 export function followDetails($: EngineInterface) {
+  isFollowing = true
   return scrollDetails($, { to: 'end' })
+}
+
+/**
+ * Whether Details should stay at its newest lines: yes until the person scrolls away from the end, and again
+ * once they scroll back to it. The terminal follows the end by itself; the desktop app may not, so the
+ * hooks ask for the end again whenever Details has grown.
+ */
+let isFollowing = true
+
+/** Reads a scroll of Details: only the person's move changes whether it follows. */
+export function noteScroll(e: { origin: { kind: string }; offset: number; bodyRows: number; contentRows: number }) {
+  if (e.origin.kind !== 'person') return
+  isFollowing = e.offset >= e.contentRows - e.bodyRows
+}
+
+/** Brings Details back to its newest lines after it grew, if it is open and the person has not scrolled away. */
+export async function keepInView($: EngineInterface) {
+  if (!isFollowing) return
+  try {
+    if ((await $.ui.panes()).some(pane => pane.id === DETAILS_PANE)) await scrollDetails($, { to: 'end' })
+  } catch {
+    // No panes to read (a headless host): nothing to keep in view.
+  }
 }
 
 /** Puts every failed action, with what it answered, on the clipboard, and says whether it took. */

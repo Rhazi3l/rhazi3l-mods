@@ -5,6 +5,7 @@ import type { On } from 'claude-code'
 import { PASTEL } from '../hooks/palette'
 import { barSvg, meterCells, stepWindow } from '../hooks/bars'
 import { asksSomething, plannedTodos } from '../hooks/checklist'
+import { noteScroll, keepInView } from '../hooks/panes'
 import { cleanName, describeAction, extractQuestion, quickReplies } from '../hooks/text'
 
 const PREFIX = 'mcp__clean-view__'
@@ -601,6 +602,30 @@ describe('checklist', () => {
     const slow = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await slow.find({ key: 'clean-view-trail' })).toMatchObject({ text: expect.stringMatching(/ · 10s$/) })
     await slow.unmount()
+  })
+
+  test('Details is brought back to its newest lines as the job grows, until the person scrolls away', async ($, on) => {
+    // The harness takes a scroll without raising it, so each look at the open panes stands for one ask for the end.
+    let asked = 0
+    on('ui.panes', () => (asked++, { value: [{ id: 'clean-view-details', title: 'Details', isShown: true, isFocused: false, isPlaced: true }] }) as never)
+    await startJob($, on)
+    await todo($, ['Read your notes', 'Build the site'])
+    await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/brand.md' })
+    expect(asked).toBeGreaterThan(0)
+
+    // The test's own copy of the module (the engine keeps another): the person wheels away from the end,
+    // so Details is left where they put it; back at the end it follows again; a plugin's move never counts.
+    const before = asked
+    const lookalike = { ui: { panes: async () => (asked++, [{ id: 'clean-view-details' }]), scroll: async () => ({}) } } as never
+    noteScroll({ origin: { kind: 'person' }, offset: 2, bodyRows: 20, contentRows: 80 })
+    await keepInView(lookalike)
+    expect(asked).toBe(before)
+    noteScroll({ origin: { kind: 'plugin' }, offset: 60, bodyRows: 20, contentRows: 80 })
+    await keepInView(lookalike)
+    expect(asked).toBe(before)
+    noteScroll({ origin: { kind: 'person' }, offset: 60, bodyRows: 20, contentRows: 80 })
+    await keepInView(lookalike)
+    expect(asked).toBe(before + 1)
   })
 
   test('a long job that ends where it needs you sends one alert, a short one none, and /view alerts off silences it', async ($, on) => {

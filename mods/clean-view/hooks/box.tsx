@@ -121,26 +121,30 @@ export async function drawBox(
   )
   const waitsForReply = c.phase === 'needsYou' && c.question !== ''
   // What Claude is asking, and one-press answers where the question has clear options.
+  // The question and its buttons share a row, the buttons at the right where the steps' bars sit, so the
+  // question takes one row less; a long question wraps in the room beside them.
   const askRows = waitsForReply
     ? [
-        <Box key="clean-view-question" flexShrink={1}>
-          <Text wrap="wrap">{c.question}</Text>
-        </Box>,
-        c.replies.length > 0 ? (
-          <Box key="clean-view-replies" flexDirection="row" flexWrap="wrap" gap={1}>
-            {c.replies.map((reply, i) => (
-              <Button
-                key={`clean-view-reply-${i}`}
-                label={reply.label}
-                variant={i === 0 ? 'primary' : 'secondary'}
-                onPress={() => {
-                  // Sent as the person's own words; the job carries on from it.
-                  void $.prompt.submit({ text: reply.text, asUser: true })
-                }}
-              />
-            ))}
+        <Box key="clean-view-ask" flexDirection="row" flexWrap="wrap" alignItems="center" gap={1} paddingY={isTerminal ? undefined : 'xs'}>
+          <Box key="clean-view-question" flexGrow={1} flexShrink={1}>
+            <Text wrap="wrap">{c.question}</Text>
           </Box>
-        ) : null,
+          {c.replies.length > 0 && (
+            <Box key="clean-view-replies" flexDirection="row" flexWrap="wrap" flexShrink={0} gap={1}>
+              {c.replies.map((reply, i) => (
+                <Button
+                  key={`clean-view-reply-${i}`}
+                  label={reply.label}
+                  variant={i === 0 ? 'primary' : 'secondary'}
+                  onPress={() => {
+                    // Sent as the person's own words; the job carries on from it.
+                    void $.prompt.submit({ text: reply.text, asUser: true })
+                  }}
+                />
+              ))}
+            </Box>
+          )}
+        </Box>,
       ]
     : []
   // The frame keeps the checklist apart from the reply; its colour says how the job stands.

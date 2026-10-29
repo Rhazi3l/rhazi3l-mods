@@ -18,7 +18,7 @@ import {
   titleFor, trackSteps,
 } from './checklist'
 import { COMMANDS } from './info'
-import { drawDetails, followDetails } from './panes'
+import { drawDetails, followDetails, keepInView, noteScroll } from './panes'
 import { PASTEL } from './palette'
 import {
   DEFAULT_TITLE, DETAILS_PANE, EMPTY, REASON_PERMISSION, REASON_QUESTION, REASON_REPLY, STORE_ALERTS, STORE_ON,
@@ -231,6 +231,7 @@ export const register: Register = on => {
       }
       return changed
     })
+    await keepInView($)
 
     const ran = await next(e)
     const isFailed = ran.deny !== undefined || ran.isError === true
@@ -292,6 +293,7 @@ export const register: Register = on => {
     })
 
     failStreak = !isFailed || isUserRefusal(failText) ? 0 : failStreak + 1
+    await keepInView($)
     return ran
   }).catch((_$, e, next) => next(e))
 
@@ -348,6 +350,12 @@ export const register: Register = on => {
     const c = await read($, checklistAtom)
     if (e.props.hasSurvey || (await read($, isOffAtom)) || c.phase === 'idle' || c.startedAt === null) return next(e)
     return drawBox($, e, c, { startedAt: c.startedAt, tick: await read($, tickAtom), helpers: await runningHelpers($), below: await next(e) })
+  })
+
+  // Whether the person has scrolled Details away from its newest lines, so it is not pulled back.
+  on('ui.scroll', { requestId: DETAILS_PANE }, async (_$, e, next) => {
+    noteScroll(e)
+    return next(e)
   })
 
   // The Details pane.
@@ -430,6 +438,7 @@ export const register: Register = on => {
       pendingNote = newId('note')
       const id = pendingNote
       await update($, checklistAtom, c => (c.startedAt === null ? c : recordNote(c, id, text)))
+      await keepInView($)
     }
     for (const chunk of held) yield chunk
     return response
