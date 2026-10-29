@@ -109,7 +109,7 @@ describe('plain names', () => {
     )
     expect(describeAction('mcp__claude_ai_Gmail__search_threads', {}, PREFIX)?.detail).toBe('Gmail → search threads')
     expect(describeAction('Bash', { command: 'git push origin main', description: 'Push the config' }, PREFIX)?.detail).toBe(
-      'Push the config (git push)',
+      'Push the config',
     )
     expect(describeAction('Artifact', { action: 'read', url: 'https://claude.ai/artifact/7UE1qe7SS7CN2KMjmWHeDG' }, PREFIX)).toMatchObject({
       label: 'Read an artifact',
@@ -135,6 +135,17 @@ describe('checklist', () => {
   })
 
 
+  test('before a plan arrives there is one Working line and no step rows', async ($, on) => {
+    await startJob($, on)
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect(await ui.find({ type: 'Text', text: '✱ Working…' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /^Working$/ })).toBeUndefined()
+      expect(await ui.find({ type: 'Text', text: /Up next|Understand|Plan the steps/ })).toBeUndefined()
+      await ui.unmount()
+    }
+  })
+
   test('a to-do list draws done, Working, Next and Up next', async ($, on) => {
     await startJob($, on)
     await todo($, ['Read your brand notes', 'Build the pricing section', 'Add the contact form', 'Polish the footer'], 1)
@@ -143,8 +154,9 @@ describe('checklist', () => {
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await ui.find({ type: 'Text', text: /✓/ })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: 'Working' })).toBeDefined()
-      // No percent is reported, so the header takes its name from the first step.
-      expect(await ui.find({ type: 'Text', text: '✱ Read your brand notes' })).toBeDefined()
+      // The header keeps the generic title while it would only repeat the first step's name.
+      expect(await ui.find({ type: 'Text', text: '✱ Working on your request' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: '✱ Read your brand notes' })).toBeUndefined()
       expect(await ui.find({ type: 'Text', text: /^Next$/ })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: 'Up next' })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /▶/ })).toBeDefined()
@@ -215,6 +227,28 @@ describe('checklist', () => {
       expect(await ui.find({ type: 'Text' })).toBeUndefined()
       await ui.unmount()
     }
+  })
+
+  test('the spinner line is cut to its word once a plan exists, on the terminal only', async ($, on) => {
+    const SPINNER = { plugin: 'clean-view', component: 'Spinner', props: { word: 'Fermenting', message: null, suffix: '…', mode: 'responding' } } as const
+    on('ui.render', { component: 'Spinner' }, ($, e) => {
+      const { Text } = $.ui.resolve(e)
+      return <Text>engine spinner with to-do rows</Text>
+    })
+    await startJob($, on)
+    const before = await $.ui.mount({ ...SPINNER, surface: 'terminal' })
+    expect(await before.find({ type: 'Text', text: /engine spinner/ })).toBeDefined()
+    await before.unmount()
+
+    await todo($, ['Read your notes', 'Write the page'])
+    const terminal = await $.ui.mount({ ...SPINNER, surface: 'terminal' })
+    expect(await terminal.find({ type: 'Text', text: 'Fermenting…' })).toBeDefined()
+    expect(await terminal.find({ type: 'Text', text: /engine spinner/ })).toBeUndefined()
+    await terminal.unmount()
+
+    const desktop = await $.ui.mount({ ...SPINNER, surface: 'desktop' })
+    expect(await desktop.find({ type: 'Text', text: /engine spinner/ })).toBeDefined()
+    await desktop.unmount()
   })
 
   test('the latest action shows on the step in progress', async ($, on) => {
@@ -343,7 +377,7 @@ describe('replying to a question', () => {
     const next = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await next.find({ type: 'Text', text: /Needs you/ })).toBeUndefined()
     expect(await next.find({ key: 'clean-view-question' })).toBeUndefined()
-    expect(await next.find({ type: 'Text', text: /Understand your request/ })).toBeDefined()
+    expect(await next.find({ type: 'Text', text: '✱ Working…' })).toBeDefined()
     await next.unmount()
   })
 
@@ -469,12 +503,12 @@ describe('on and off', () => {
     await startJob($, on)
     await $.command.run({ command: 'view', args: 'off', ...RUN })
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await ui.find({ type: 'Text', text: /Understand your request/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /Working…/ })).toBeUndefined()
     const free = await $.tool.call({ tool: 'Read', file_path: '/tmp/a.md' })
     expect(free.deny).toBeUndefined()
 
     await $.command.run({ command: 'view', args: 'on', ...RUN })
-    expect(await ui.find({ type: 'Text', text: /Understand your request/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '✱ Working…' })).toBeDefined()
     await ui.unmount()
   })
 })

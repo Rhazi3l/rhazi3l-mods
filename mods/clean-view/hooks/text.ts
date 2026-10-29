@@ -108,18 +108,6 @@ function shortUrl(url: unknown): string {
   return trimToWidth(bare, 60)
 }
 
-/** The program a shell command runs, plus its subcommand: "git push", "npm install". */
-function commandHead(command: unknown): string {
-  const first = String(command ?? '')
-    .trim()
-    .split(/\s*(?:&&|\|\||;|\|)\s*/)[0] ?? ''
-  const tokens = first.split(/\s+/).filter(token => !/^[A-Z_][A-Z0-9_]*=/.test(token))
-  const program = basename(tokens[0] ?? '')
-  const sub = tokens[1]
-  const hasSub = sub !== undefined && /^[a-z][a-z0-9-]*$/.test(sub)
-  return hasSub ? `${program} ${sub}` : program
-}
-
 /** Pretty name of an MCP server: "claude_ai_Gmail" → "Gmail". */
 function serverName(server: string): string {
   return words(server.replace(/^claude_ai_/i, '')) || server
@@ -152,9 +140,8 @@ export function describeAction(tool: string, input: unknown, ownPrefix: string):
         detail: `${String(args.subagent_type ?? 'general-purpose')}: "${trimToWidth(String(args.description ?? ''), 40)}"`,
       }
     case 'Bash': {
-      const head = commandHead(args.command)
       const what = args.description ? trimToWidth(String(args.description), 50) : 'A command'
-      return { icon: '⌨️', label: 'Ran a command', detail: head ? `${what} (${head})` : what }
+      return { icon: '⌨️', label: 'Ran a command', detail: what }
     }
     case 'Read':
       return { icon: '📄', label: 'Read a file', detail: basename(args.file_path) }

@@ -97,13 +97,6 @@ const hasUnfinished = (c: Checklist) => c.tasks.some(t => t.status !== 'done')
 
 // ---------- Checklist transitions (pure) ----------
 
-function placeholderTasks(): ChecklistTask[] {
-  return [
-    { id: newId('p'), name: 'Understand your request', status: 'active', percent: 0, hasReported: false },
-    { id: newId('p'), name: 'Plan the steps', status: 'upcoming', percent: 0, hasReported: false },
-  ]
-}
-
 function startFirstUpcoming(tasks: ChecklistTask[]): ChecklistTask[] {
   if (tasks.some(t => t.status === 'active')) return tasks
   const i = tasks.findIndex(t => t.status === 'upcoming')
@@ -349,7 +342,6 @@ export const register: Register = on => {
         jobId: c.jobId + 1,
         title: DEFAULT_TITLE,
         phase: 'working',
-        tasks: placeholderTasks(),
         startedAt: now,
       }))
       if (shouldTick(written, mode) && !ticker) {
@@ -548,7 +540,7 @@ export const register: Register = on => {
     const elapsed = formatDuration((c.finishedAt ?? now) - c.startedAt)
     let header = (
       <Text bold color={PASTEL.working} wrap="truncate-end">
-        {`✱ ${c.title}`}
+        {c.tasks.length === 0 ? '✱ Working…' : `✱ ${c.tasks[0]?.name === c.title ? DEFAULT_TITLE : c.title}`}
       </Text>
     )
     if (c.phase === 'needsYou') {
@@ -566,13 +558,13 @@ export const register: Register = on => {
     } else if (c.phase === 'stopped') {
       header = (
         <Text color={PASTEL.stuck} wrap="truncate-end">
-          {`■ Stopped · ${c.title} · you pressed Esc`}
+          {`■ Stopped${c.tasks.length === 0 ? '' : ` · ${c.title}`} · you pressed Esc`}
         </Text>
       )
     } else if (c.phase === 'done') {
       header = (
         <Text color={PASTEL.done} wrap="truncate-end">
-          {`✓ All done · ${c.title}`}
+          {`✓ All done${c.tasks.length === 0 ? '' : ` · ${c.title}`}`}
         </Text>
       )
     }
@@ -638,7 +630,8 @@ export const register: Register = on => {
       )
     }
 
-    const { start: windowStart, end: windowEnd } = stepWindow(c.tasks)
+    // A finished job lists every step, so nothing is folded into "N done".
+    const { start: windowStart, end: windowEnd } = c.phase === 'done' ? { start: 0, end: c.tasks.length } : stepWindow(c.tasks)
 
     const nameWidth = Math.max(8, Math.min(MAX_NAME, width - 24))
     const firstUpcoming = c.tasks.findIndex(t => t.status === 'upcoming')
@@ -815,8 +808,10 @@ export const register: Register = on => {
       const lines = group.actions.map(a => (
         <Box key={`action-${a.id}`} flexDirection="column" paddingLeft={2}>
           <Box flexDirection="row">
-            <Text>{`${a.isHelper ? '🤖 ' : ''}${a.icon} `}</Text>
-            <Text>{a.label}</Text>
+            <Box flexDirection="row" flexShrink={0}>
+              <Text>{`${a.isHelper ? '🤖 ' : ''}${a.icon} `}</Text>
+              <Text>{a.label}</Text>
+            </Box>
             {a.detail !== '' && <Text dimColor wrap="truncate-end">{` · ${a.detail}`}</Text>}
             {a.isFailed && <Text color={PASTEL.error}>{" · didn't work"}</Text>}
           </Box>
@@ -883,6 +878,14 @@ export const register: Register = on => {
     if (e.surface !== 'terminal') return next({ ...e, props: { ...e.props, isExpanded: true } })
     const { Box } = $.ui.resolve(e)
     return <Box />
+  })
+
+  // The spinner line carries Claude Code's own to-do rows beneath it, which the
+  // checklist above the prompt already shows, so with a real plan it is cut to the word.
+  on('ui.render', { component: 'Spinner' }, async ($, e, next) => {
+    if (e.surface !== 'terminal' || (await read($, modeAtom)) !== 'guided' || !(await read($, checklistAtom)).hasRealPlan) return next(e)
+    const { Text } = $.ui.resolve(e)
+    return <Text color={PASTEL.working}>{`${e.props.message ?? e.props.word}${e.props.suffix}`}</Text>
   })
 
   on('ui.render', { component: 'ToolProgress' }, async ($, e, next) => {
