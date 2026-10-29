@@ -237,7 +237,7 @@ describe('checklist', () => {
     expect(JSON.stringify(gone)).toContain('/view details')
   })
 
-  test('Details lists every step and action in full, and can bring the tool rows back', async ($, on) => {
+  test('Details lists every step and action in full, and opening it brings the tool rows back', async ($, on) => {
     on('ui.open', () => ({ value: { isPlaced: true } }))
     on('tool.call', { tool: 'Bash' }, () => ({ result: 'failed', isError: true, text: 'bash: hugo: command not found\nmore' }) as never)
     on('ui.render', { component: 'ToolUse' }, ($, e) => {
@@ -263,11 +263,11 @@ describe('checklist', () => {
     const opened = await $.command.run({ command: 'view', args: 'details', ...RUN })
     expect(opened.text).toContain('Details open')
 
+    // Opening Details brings the hidden tool rows back; there is no button to pick it.
     const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
-    await pane.press({ key: 'clean-view-raw' })
     const row = await $.ui.mount({ ...ROW, surface: 'terminal' })
     expect(await row.find({ type: 'Text', text: 'engine row' })).toBeDefined()
-    expect(await pane.find({ key: 'clean-view-raw' })).toMatchObject({ text: 'Hide tool output' })
+    expect(await pane.find({ key: 'clean-view-raw' })).toBeUndefined()
     await row.unmount()
     await pane.unmount()
   })

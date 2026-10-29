@@ -304,6 +304,12 @@ export function barSvg(cells: boolean[], litColor: string): string {
 
 // ---------- Hooks ----------
 
+/** Opening Details also brings back every tool row and its output in the transcript, until the next job. */
+async function openDetails($: EngineInterface) {
+  await update($, rawAtom, () => true)
+  return $.ui.open({ id: DETAILS_PANE, title: DETAILS_TITLE })
+}
+
 /**
  * A /clear starts the session's values over and fires no session.start, so Clean View's on/off (which the
  * toolbox reads to show its button) is written again from what was saved.
@@ -332,7 +338,7 @@ export const register: Register = on => {
   on('command.run', { command: 'view' }, async ($, e) => {
     const arg = e.args.trim().toLowerCase()
     if (arg === 'details') {
-      const opened = await $.ui.open({ id: DETAILS_PANE, title: DETAILS_TITLE })
+      const opened = await openDetails($)
       return {
         text: opened.isPlaced
           ? 'Details open: every step and action of this job.'
@@ -623,7 +629,7 @@ export const register: Register = on => {
           key="clean-view-details"
           label="Details"
           hotkey="d"
-          onPress={() => $.ui.open({ id: DETAILS_PANE, title: DETAILS_TITLE })}
+          onPress={() => openDetails($)}
         />
       </Box>
     )
@@ -861,20 +867,8 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: DETAILS_PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const c = await read($, checklistAtom)
-    const isRaw = await read($, rawAtom)
     const now = await $.clock.now()
 
-    const rawButton = (
-      <Button
-        key="clean-view-raw"
-        label={isRaw ? 'Hide tool output' : 'Show tool output'}
-        hotkey="o"
-        onPress={async () => {
-          const shows = await update($, rawAtom, raw => !raw)
-          $.ui.toast(shows ? 'Tool rows and their output are back in the transcript.' : 'Transcript is clean again.')
-        }}
-      />
-    )
     if (c.startedAt === null) {
       return (
         <Box flexDirection="column">
@@ -942,7 +936,6 @@ export const register: Register = on => {
             </Text>
             <Text dimColor>{`  ${summary}`}</Text>
           </Box>
-          {rawButton}
         </Box>
         {groups}
       </Box>
