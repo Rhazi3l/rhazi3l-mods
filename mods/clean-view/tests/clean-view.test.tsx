@@ -170,20 +170,6 @@ describe('checklist', () => {
     await ui.unmount()
   })
 
-  test('a reply sent by a button is drawn as a plain prompt, other rows are left alone', async ($, on) => {
-    on('ui.render', { component: 'UserMessage' }, ($, e) => {
-      const { Text } = $.ui.resolve(e)
-      return <Text>engine row</Text>
-    })
-    const ROWPROPS = { text: 'Yes', isExpanded: false } as const
-    const mine = await $.ui.mount({ plugin: 'clean-view', component: 'UserMessage', surface: 'terminal', props: { ...ROWPROPS, origin: { kind: 'plugin', name: 'clean-view', asUser: true } } } as never)
-    expect(await mine.find({ type: 'Text', text: '❯ Yes' })).toBeDefined()
-    await mine.unmount()
-    const typed = await $.ui.mount({ plugin: 'clean-view', component: 'UserMessage', surface: 'terminal', props: { ...ROWPROPS, origin: { kind: 'composer' } } } as never)
-    expect(await typed.find({ type: 'Text', text: 'engine row' })).toBeDefined()
-    await typed.unmount()
-  })
-
   test('a to-do list draws done, Working, Next and Up next', async ($, on) => {
     await startJob($, on)
     await todo($, ['Read your brand notes', 'Build the pricing section', 'Add the contact form', 'Polish the footer'], 1)

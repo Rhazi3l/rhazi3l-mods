@@ -890,15 +890,6 @@ export const register: Register = on => {
     return <Text color={PASTEL.working}>{`${e.props.message ?? e.props.word}${e.props.suffix}`}</Text>
   })
 
-  // A reply button sends its text as the person's words, but the transcript adds a dim
-  // "Prompt from the clean-view plugin" row for it, so the row is drawn as a plain prompt.
-  on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
-    const { origin } = e.props
-    if (origin.kind !== 'plugin' || origin.name !== 'clean-view') return next(e)
-    const { Text } = $.ui.resolve(e)
-    return <Text>{`❯ ${e.props.text}`}</Text>
-  })
-
   on('ui.render', { component: 'ToolProgress' }, async ($, e, next) => {
     if (await read($, showsToolRowsAtom)) return next(e)
     return next({ ...e, props: { ...e.props, hint: '' } })
