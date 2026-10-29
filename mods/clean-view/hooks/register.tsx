@@ -6,7 +6,7 @@
 // View off) leaves Claude Code as it is.
 
 import { atom, derive, read, update } from 'claude-code'
-import type { EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
+import type { Chunk, EngineInterface, Register, RenderChildren, Timer } from 'claude-code'
 
 import type { Checklist, ChecklistAction, ChecklistTask, ViewMode } from '../types'
 import { COMMANDS } from './info'
@@ -62,6 +62,7 @@ const EMPTY: Checklist = {
   hasRealPlan: false,
   jobId: 0,
   actions: [],
+  notes: [],
 }
 
 // Values the drawings read (types/index.d.ts). `isOn` is saved in $.store too, so it
@@ -83,7 +84,7 @@ const PROMPT_SECTION = `# Clean View
 The person sees your to-do list as a plain-English checklist; tool output is hidden.
 - For work of two or more steps, start with a to-do list (TodoWrite, TaskCreate, or the app's own plan tool, update_plan) and keep it current, marking each step completed as soon as it is done. Skip the list for a quick question.
 - Write every step name in plain English, under 40 characters, starting with a verb, like "Build the pricing section". No file paths, file names, commands, code or tool names.
-- Answer first, in as few words as possible. Do not narrate steps or repeat results the person can open in Details. End with a short plain-English summary of what changed and anything they must decide.`
+- Answer first, in as few words as possible. Do not narrate steps or repeat results the person can open in Details. Text you write between tool calls is hidden, so keep any finding, risk or choice you made for the closing summary. If you need the person's decision, stop and ask it as the last paragraph, ending with a question mark. End with a short plain-English summary of what changed and anything they must decide.`
 
 // Module state: rebuilt on every reload (session.start fires again then).
 let ticker: Timer | undefined
@@ -191,6 +192,15 @@ function recordAction(c: Checklist, action: ChecklistAction): Checklist {
   return { ...c, actions: [...c.actions.filter(a => a.id !== action.id), action].slice(-MAX_ACTIONS) }
 }
 
+/** A note as one line: its first paragraph with the line breaks closed up. */
+const oneLine = (text: string) => (text.split(/\n\s*\n/)[0] ?? '').replace(/\s+/g, ' ').trim()
+
+function recordNote(c: Checklist, text: string): Checklist {
+  const step = currentStep(c)
+  const note = { id: newId('note'), text, step, before: c.actions.filter(a => a.step === step).length }
+  return { ...c, notes: [...c.notes, note].slice(-100) }
+}
+
 function markFailed(c: Checklist, id: string, note: string): Checklist {
   return { ...c, actions: c.actions.map(a => (a.id === id ? { ...a, isFailed: true, note } : a)) }
 }
@@ -211,7 +221,7 @@ function currentStep(c: Checklist): string {
  */
 function detailGroups(c: Checklist): { step: string; status: ChecklistTask['status']; actions: ChecklistAction[] }[] {
   const planned = new Set(c.tasks.map(t => t.name))
-  const earlier = [...new Set(c.actions.map(a => a.step).filter(step => !planned.has(step)))]
+  const earlier = [...new Set([...c.actions, ...c.notes].map(a => a.step).filter(step => !planned.has(step)))]
   return [
     ...earlier.map(step => ({ step, status: 'done' as const, actions: c.actions.filter(a => a.step === step) })),
     ...c.tasks.map(t => ({ step: t.name, status: t.status, actions: c.actions.filter(a => a.step === t.name) })),
@@ -440,7 +450,8 @@ export const register: Register = on => {
     const ran = await next(e)
     const isFailed = ran.deny !== undefined || ran.isError === true
     const failText = ran.deny ?? (ran.isError ? ran.text : undefined)
-    const output = clipOutput(ran.deny ?? ran.text)
+    // An agent's answer is only its launch notice; the helper's own work shows beneath it.
+    const output = e.tool === 'Agent' && !isFailed ? '' : clipOutput(ran.deny ?? ran.text)
 
     await update($, checklistAtom, c => {
       let changed = setOutput(c, actionId, output)
@@ -781,9 +792,17 @@ export const register: Register = on => {
       </Box>
     )
 
+    // The latest thing Claude said between tool calls, which the transcript no longer shows.
+    const note = c.phase === 'working' || c.phase === 'stuck' ? c.notes.at(-1) : undefined
+    const noteRow = note ? (
+      <Box key="clean-view-note" paddingLeft={2}>
+        <Text dimColor wrap="truncate-end">{`💬 ${oneLine(note.text)}`}</Text>
+      </Box>
+    ) : null
+
     return (
       <Box flexDirection="column">
-        {frame([headerRow, ...askRows, ...rows, moreRow])}
+        {frame([headerRow, ...askRows, ...rows, moreRow, noteRow])}
         {below}
       </Box>
     )
@@ -874,7 +893,16 @@ export const register: Register = on => {
           {group.actions.length > 0 && <Text dimColor>{`  ${group.actions.length}`}</Text>}
         </Box>
       )
-      const lines = group.actions.map(a => (
+      const notesOf = c.notes.filter(n => n.step === group.step)
+      const noteLine = (n: (typeof notesOf)[number]) => (
+        <Box key={`note-${n.id}`} paddingLeft={2}>
+          <Text color="subtle" wrap="wrap">{`💬 ${n.text}`}</Text>
+        </Box>
+      )
+      const lines = group.actions.flatMap((a, i) => [
+        ...notesOf.filter(n => n.before === i).map(noteLine),
+        (
+
         <Box key={`action-${a.id}`} flexDirection="column" paddingLeft={2}>
           <Box flexDirection="row">
             <Box flexDirection="row" flexShrink={0}>
@@ -910,8 +938,10 @@ export const register: Register = on => {
             </Box>
           )}
         </Box>
-      ))
-      return [head, ...lines]
+        ),
+      ])
+      const trailing = notesOf.filter(n => n.before >= group.actions.length).map(noteLine)
+      return [head, ...lines, ...trailing]
     })
 
     return (
@@ -973,22 +1003,37 @@ export const register: Register = on => {
     return <Box />
   })
 
-  // What Claude writes between tool calls ("Now the fix for...") is narration: the answer is
-  // the text of a step that calls no tool. A step that did call one has its text remembered
-  // here, and the transcript hides it. The checklist and Details already tell that story.
+  // What Claude writes between tool calls ("Now the fix for...") is narration: the closing
+  // answer is the text of a step that calls no tool. Which one a step's text is only shows
+  // when the step ends, so once text starts the step's pieces are held back until then; a
+  // narration is remembered before it is let through, and the transcript never draws it.
+  // The cost is that an answer appears whole instead of typing out.
   on('turn.step', async function* ($, e, next) {
-    const response = yield* next(e)
-    const text = response.answer.trim()
-    if (e.agentId === undefined && text !== '' && response.toolUses.length > 0) {
-      await update($, narrationAtom, list => [...list.slice(-199), text])
+    if (e.agentId !== undefined || (await read($, showsToolRowsAtom))) return yield* next(e)
+    const held: Chunk<'turn.step'>[] = []
+    const stream = next(e)[Symbol.asyncIterator]()
+    let step = await stream.next()
+    while (!step.done) {
+      if (held.length > 0 || step.value.kind === 'text') held.push(step.value)
+      else yield step.value
+      step = await stream.next()
     }
+    const response = step.value
+    const text = response.answer.trim()
+    if (text !== '' && response.toolUses.length > 0) {
+      await update($, narrationAtom, list => [...list.slice(-199), text])
+      await update($, checklistAtom, c => (c.startedAt === null ? c : recordNote(c, text)))
+    }
+    for (const chunk of held) yield chunk
     return response
   })
 
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     if (await read($, showsToolRowsAtom)) return next(e)
     const text = e.props.text.trim()
-    const isNarration = text !== '' && (await read($, narrationAtom)).some(n => n.includes(text))
+    // The engine folds text between tool calls into a faint "summary" block of its own wording,
+    // which no remembered step text can match; a closing answer is never one.
+    const isNarration = e.props.isSummary === true || (text !== '' && (await read($, narrationAtom)).some(n => n.includes(text)))
     if (!isNarration) return next(e)
     const { Box } = $.ui.resolve(e)
     return <Box />

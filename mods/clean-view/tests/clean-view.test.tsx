@@ -403,8 +403,46 @@ describe('checklist', () => {
 
     expect(await shown('Now the fix for the wrapping.')).toBe(false)
     expect(await shown('All sorted.')).toBe(true)
+    const summary = await $.ui.mount({ plugin: 'clean-view', component: 'AssistantMessage', surface: 'terminal', props: { text: 'Noticed a licence gap.', isFirstOfReply: true, isSummary: true } } as never)
+    expect(await summary.find({ type: 'Text', text: 'engine row' })).toBeUndefined()
+    await summary.unmount()
     await $.command.run({ command: 'view', args: 'off', ...RUN })
     expect(await shown('Now the fix for the wrapping.')).toBe(true)
+  })
+
+  test('what Claude says between tool calls shows as a line in the box and in full in Details', async ($, on) => {
+    on('turn.step', async function* (_$, e) {
+      const answer = e.index === 0 ? 'Found a licence gap.\n\nWorth fixing before this goes public.' : 'All sorted.'
+      return { turnId: e.turnId, index: e.index, answer, toolUses: e.index === 0 ? [{ id: 'u1', name: 'Read', input: {} }] : [], stopReason: null } as never
+    })
+    await startJob($, on)
+    await todo($, ['Read your notes', 'Build the site'])
+    for await (const _chunk of $.turn.step({ turnId: 't1', index: 0, model: 'm', messageCount: 1 } as never)) void _chunk
+    await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/brand.md' })
+
+    for (const surface of SURFACES) {
+      const box = await $.ui.mount({ ...BAND, surface })
+      expect(await box.find({ type: 'Text', text: '💬 Found a licence gap.' })).toBeDefined()
+      expect(await box.find({ type: 'Text', text: 'Worth fixing' })).toBeUndefined()
+      await box.unmount()
+      const pane = await $.ui.mount({ ...PANE, surface })
+      expect(await pane.find({ type: 'Text', text: /Worth fixing before this goes public/ })).toBeDefined()
+      await pane.unmount()
+    }
+  })
+
+  test('a step\'s text is held until the step ends and passed on in order', async ($, on) => {
+    on('turn.step', async function* (_$, e) {
+      yield { kind: 'thinking', index: 0, text: 'hm' } as never
+      yield { kind: 'text', index: 1, text: 'Now the ' } as never
+      yield { kind: 'text', index: 1, text: 'fix.' } as never
+      yield { kind: 'tool', index: 2, id: 'u1', name: 'Read' } as never
+      return { turnId: e.turnId, index: e.index, answer: 'Now the fix.', toolUses: [{ id: 'u1', name: 'Read', input: {} }], stopReason: null } as never
+    })
+    await startJob($, on)
+    const kinds: string[] = []
+    for await (const chunk of $.turn.step({ turnId: 't1', index: 0, model: 'm', messageCount: 1 } as never)) kinds.push(chunk.kind)
+    expect(kinds).toEqual(['thinking', 'text', 'text', 'tool'])
   })
 
   test('the spinner line is cut to its word once a plan exists, on the terminal only', async ($, on) => {

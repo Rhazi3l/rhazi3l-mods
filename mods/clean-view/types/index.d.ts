@@ -32,6 +32,16 @@ export type ChecklistAction = {
   output: string
 }
 
+/** What Claude wrote between tool calls: hidden from the transcript, shown in the box and in Details. */
+export type ChecklistNote = {
+  id: string
+  text: string
+  /** The checklist step that was active when it was written. */
+  step: string
+  /** How many of that step's actions came before it, so Details can place it among them. */
+  before: number
+}
+
 export type Checklist = {
   title: string
   phase: ChecklistPhase
@@ -51,6 +61,8 @@ export type Checklist = {
   jobId: number
   /** The job's actions, newest last, up to the last 300. */
   actions: ChecklistAction[]
+  /** Claude's notes between tool calls, newest last, up to the last 100. */
+  notes: ChecklistNote[]
 }
 
 declare module 'claude-code' {
