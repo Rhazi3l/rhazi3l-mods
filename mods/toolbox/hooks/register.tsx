@@ -49,10 +49,11 @@ const SIBLINGS = [CLEAN_VIEW, PROMPT_UPGRADE, DESKBAR]
 
 /** Each sibling mod with its on/off, or undefined while it isn't installed. */
 async function siblingStates($: EngineInterface): Promise<{ mod: SiblingMod; isOn: boolean | undefined }[]> {
-  // Each mod writes its own value; the toolbox only reads them.
-  const { value: cleanViewOn } = await $.state.get({ plugin: 'clean-view', key: 'isOn' } as const)
-  const { value: promptUpgradeOn } = await $.state.get({ plugin: 'prompt-upgrade', key: 'isOn' } as const)
-  const { value: deskbarOn } = await $.state.get({ plugin: 'deskbar', key: 'isOn' } as const)
+  // Each mod writes its own value; the toolbox only reads them. A mod that isn't installed answers
+  // nothing, or refuses the read; either way it is left out and the others still show.
+  const cleanViewOn = await $.state.get({ plugin: 'clean-view', key: 'isOn' } as const).then(read => read.value, () => undefined)
+  const promptUpgradeOn = await $.state.get({ plugin: 'prompt-upgrade', key: 'isOn' } as const).then(read => read.value, () => undefined)
+  const deskbarOn = await $.state.get({ plugin: 'deskbar', key: 'isOn' } as const).then(read => read.value, () => undefined)
   return [
     { mod: CLEAN_VIEW, isOn: cleanViewOn },
     { mod: PROMPT_UPGRADE, isOn: promptUpgradeOn },

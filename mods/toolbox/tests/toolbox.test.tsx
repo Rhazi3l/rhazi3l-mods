@@ -275,4 +275,19 @@ describe('toolbox', () => {
     const listed = await $.command.run({ command: 'mods', args: '', ...RUN })
     expect(listed.text).toContain('**Deskbar**')
   })
+
+  test('a mod whose state can\'t be read does not take the Mods row down with it', async ($, on) => {
+    // Clean View answers; Deskbar is not installed, so reading its value is refused.
+    on('state.get', ($, e, next) => {
+      if (e.plugin === 'deskbar') return { deny: 'no such plugin' } as never
+      return e.plugin === 'clean-view' && e.key === 'isOn' ? ({ value: { value: true, version: 1 } } as never) : next(e)
+    })
+    await startSession($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
+    const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await band.find({ key: 'toolbox-panel' })).toBeDefined()
+    expect(await band.find({ key: 'mod-clean-view' })).toMatchObject({ text: '● Clean View' })
+    expect(await band.find({ key: 'mod-deskbar' })).toBeUndefined()
+    await band.unmount()
+  })
 })
