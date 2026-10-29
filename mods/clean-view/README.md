@@ -31,7 +31,7 @@ Press **Details** (or `d`). The pane opens at the newest lines and follows them 
 - Claude's notes sit at the step they introduced, in grey italics after `💬`.
 - White names what happened, one grey carries what backs it up, red is only for what went wrong.
 - While the job runs, finished steps fold to their heading (a step with an error stays open). **Show all** at the bottom opens them, **Fold finished** closes them again, and a finished job lists everything.
-- **Errors only** keeps just the failed actions and their steps; **All actions** brings the rest back. **Copy errors** puts every failed action and what it answered on the clipboard.
+- **Errors only** keeps just the failed actions and their steps; **All actions** brings the rest back. **Copy** puts every failed action and what it answered on the clipboard.
 - Plain confirmations such as `File created successfully` are left out. Errors are not.
 
 ## Alerts
@@ -70,4 +70,4 @@ The last one confirms every mod's copy of `palette.ts` still matches.
 
 ## Not covered by the tests
 
-The test harness accepts a scroll but does not move a window, so the follow-the-newest-lines behaviour, `Show error`'s jump and a native notification need checking by hand.
+The test harness accepts a scroll but does not move a window, so the follow-the-newest-lines behaviour, `Show error`'s jump, the `Copy` button's clipboard write and a native notification need checking by hand.

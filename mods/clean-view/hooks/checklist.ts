@@ -92,7 +92,6 @@ export function setStuck(c: Checklist, reason: string): Checklist {
   return { ...c, phase: 'stuck', stuckReason: reason, needsYouReason: null }
 }
 
-
 export function recordAction(c: Checklist, action: ChecklistAction): Checklist {
   return { ...c, actions: [...c.actions.filter(a => a.id !== action.id), action].slice(-MAX_ACTIONS) }
 }

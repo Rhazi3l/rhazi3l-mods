@@ -46,13 +46,11 @@ const TICK_MS = 250
 const COLLAPSE_MS = 5000
 const FAILS_BEFORE_STUCK = 3
 
-
 const PROMPT_SECTION = `# Clean View
 The person sees your to-do list as a plain-English checklist; tool output is hidden.
 - For work of two or more steps, start with a to-do list (TodoWrite, TaskCreate, or the app's own plan tool, update_plan) and keep it current, marking each step completed as soon as it is done. Skip the list for a quick question.
 - Write every step name in plain English, under 40 characters, starting with a verb, like "Build the pricing section". No file paths, file names, commands, code or tool names.
 - Answer first, in as few words as possible. Do not narrate steps or repeat results the person can open in Details. Text you write between tool calls is hidden, so keep any finding, risk or choice you made for the closing summary. If you need the person's decision, stop and ask it as the last paragraph, ending with a question mark. End with a short plain-English summary of what changed and anything they must decide.`
-
 
 // Module state: rebuilt on every reload (session.start fires again then).
 let ticker: Timer | undefined
@@ -204,11 +202,12 @@ export const register: Register = on => {
       const ran = await next(e)
       const output = outputOf(tool, ran)
       const helperEnd = await $.clock.now()
-      await update($, checklistAtom, c => setOutput(c, id, output, helperEnd))
-      if (ran.deny !== undefined || ran.isError === true) {
-        const note = firstLine(ran.deny ?? ran.text)
-        await update($, checklistAtom, c => markFailed(c, id, note))
-      }
+      const isFailed = ran.deny !== undefined || ran.isError === true
+      const note = isFailed ? firstLine(ran.deny ?? ran.text) : ''
+      await update($, checklistAtom, c => {
+        const answered = setOutput(c, id, output, helperEnd)
+        return isFailed ? markFailed(answered, id, note) : answered
+      })
       return ran
     }
 
@@ -345,15 +344,13 @@ export const register: Register = on => {
 
   // ---------- Drawing ----------
 
-  // ---------- Drawing ----------
-
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const c = await read($, checklistAtom)
     if (e.props.hasSurvey || (await read($, isOffAtom)) || c.phase === 'idle' || c.startedAt === null) return next(e)
     return drawBox($, e, c, { startedAt: c.startedAt, tick: await read($, tickAtom), helpers: await runningHelpers($), below: await next(e) })
   })
 
-  // The colour legend and the Details pane.
+  // The Details pane.
   on('ui.render', { component: 'Pane', requestId: DETAILS_PANE }, async ($, e) => {
     return drawDetails($, e, await read($, checklistAtom), {
       showsAll: await read($, showsAllAtom),
@@ -362,7 +359,6 @@ export const register: Register = on => {
       toggleErrors: () => void update($, errorsOnlyAtom, shown => !shown),
     })
   })
-
 
   // Tool rows in the transcript: hidden while Clean View is on.
   on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {

@@ -41,10 +41,10 @@ async function copyErrors($: EngineInterface, e: RenderEvent<'Pane'>, c: Checkli
   await $.ui.toast(copied.isCopied ? 'Errors copied' : 'Could not copy the errors')
 }
 
-/** The Details pane: every step of the job and every action under it, in full. */
 /** How Details is set: the person's two switches, and what pressing each does. */
-export type DetailsView = { showsAll: boolean; errorsOnly: boolean; toggleAll: () => void; toggleErrors: () => void }
+type DetailsView = { showsAll: boolean; errorsOnly: boolean; toggleAll: () => void; toggleErrors: () => void }
 
+/** The Details pane: every step of the job and every action under it, in full. */
 export async function drawDetails($: EngineInterface, e: RenderEvent<'Pane'>, c: Checklist, view: DetailsView) {
   const { Box, Text, Button } = $.ui.resolve(e)
   const now = await $.clock.now()
@@ -139,11 +139,11 @@ export async function drawDetails($: EngineInterface, e: RenderEvent<'Pane'>, c:
   return (
     <Box flexDirection="column">
       <Box flexDirection="row" justifyContent="space-between" flexWrap={e.surface === 'terminal' ? 'nowrap' : 'wrap'}>
-        <Box flexDirection="row" flexShrink={1}>
+        <Box flexDirection="column" flexShrink={1}>
           <Text bold color={PASTEL.working} wrap="truncate-end">
             Your request
           </Text>
-          <Text dimColor>{`  ${summary}`}</Text>
+          <Text dimColor wrap="wrap">{summary}</Text>
         </Box>
       </Box>
       {groups}
@@ -154,7 +154,7 @@ export async function drawDetails($: EngineInterface, e: RenderEvent<'Pane'>, c:
             <Button key="clean-view-fold" label={view.showsAll ? 'Fold finished' : 'Show all'} onPress={view.toggleAll} />
           )}
           {failed > 0 && (
-            <Button key="clean-view-copy" label="Copy errors" onPress={() => copyErrors($, e, c)} />
+            <Button key="clean-view-copy" label="Copy" onPress={() => copyErrors($, e, c)} />
           )}
           {failed > 0 && (
             <Button key="clean-view-errors" label={view.errorsOnly ? 'All actions' : 'Errors only'} onPress={view.toggleErrors} />
