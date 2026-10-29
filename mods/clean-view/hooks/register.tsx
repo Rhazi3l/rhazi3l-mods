@@ -13,15 +13,15 @@ import type { Chunk, EngineInterface, Register, Timer } from 'claude-code'
 import type { Checklist, ChecklistTask } from '../types'
 import { drawBox } from './box'
 import {
-  applyPlanStep, applyTodos, asksSomething, clearNeedsYou, currentStep, hasUnfinished, isRunningPhase,
+  alertText, applyPlanStep, applyTodos, asksSomething, clearNeedsYou, currentStep, hasUnfinished, isRunningPhase,
   markFailed, newId, outputOf, plannedTodos, recordAction, recordNote, rehomeNote, setNeedsYou, setOutput, setStuck, startFirstUpcoming,
   titleFor, trackSteps,
 } from './checklist'
 import { COMMANDS } from './info'
-import { drawColours, drawDetails, followDetails, openDetails } from './panes'
+import { drawDetails, followDetails } from './panes'
 import { PASTEL } from './palette'
 import {
-  COLOURS_PANE, COLOURS_TITLE, DEFAULT_TITLE, DETAILS_PANE, EMPTY, REASON_PERMISSION, REASON_QUESTION, REASON_REPLY, STORE_ON,
+  DEFAULT_TITLE, DETAILS_PANE, EMPTY, REASON_PERMISSION, REASON_QUESTION, REASON_REPLY, STORE_ALERTS, STORE_ON,
   STUCK_FAILING, STUCK_REFUSAL, STUCK_REFUSED,
 } from './state'
 import { apiErrorSentence, cleanName, describeAction, describeFull, firstLine, isUserRefusal } from './text'
@@ -33,12 +33,15 @@ const checklistAtom = atom({ plugin: 'clean-view', key: 'checklist' } as const, 
 const tickAtom = atom({ plugin: 'clean-view', key: 'tick' } as const, 0)
 const narrationAtom = atom({ plugin: 'clean-view', key: 'narration' } as const, [] as string[])
 const showsAllAtom = atom({ plugin: 'clean-view', key: 'showsAll' } as const, false)
+const errorsOnlyAtom = atom({ plugin: 'clean-view', key: 'errorsOnly' } as const, false)
 
 /** Clean View off leaves the transcript as the engine draws it: tool rows, notes and all. */
 const isOffAtom = derive([isOnAtom], isOn => !isOn)
 
 const OWN_PREFIX = 'mcp__clean-view__'
 const PLAN_TOOL = 'mcp__ccd_turn__update_plan'
+/** A job shorter than this ends without an alert: the person is still looking. */
+const ALERT_AFTER_MS = 20_000
 const TICK_MS = 250
 const COLLAPSE_MS = 5000
 const FAILS_BEFORE_STUCK = 3
@@ -64,6 +67,25 @@ const shouldTick = (c: Checklist, isOn: boolean) => isOn && isRunningPhase(c)
 function stopTicker() {
   ticker?.cancel()
   ticker = undefined
+}
+
+/** The helper agents running now, for the box's light. */
+async function runningHelpers($: EngineInterface): Promise<number> {
+  try {
+    return (await $.agent.list()).filter(a => a.status === 'running' && a.teammateId === undefined).length
+  } catch {
+    return 0 // a host without agents
+  }
+}
+
+/** A native notification where the terminal has a channel for one, else a toast. */
+async function alertPerson($: EngineInterface, text: string) {
+  try {
+    if ((await $.ui.notify(text, { title: 'Clean View' })).isSent) return
+  } catch {
+    // The channel failed to write; the toast below says it instead.
+  }
+  $.ui.toast(text)
 }
 
 /**
@@ -92,21 +114,10 @@ export const register: Register = on => {
 
   on('command.run', { command: 'view' }, async ($, e) => {
     const arg = e.args.trim().toLowerCase()
-    if (arg === 'details') {
-      const opened = await openDetails($)
-      return {
-        text: opened.isPlaced
-          ? 'Details open: every step and action of this job.'
-          : `Details will show when there is room (${opened.reason}).`,
-      }
-    }
-    if (arg === 'colours' || arg === 'colors') {
-      const opened = await $.ui.open({ id: COLOURS_PANE, title: COLOURS_TITLE })
-      return {
-        text: opened.isPlaced
-          ? 'Frame colours open: every colour the checklist uses, and when.'
-          : `The frame colours will show when there is room (${opened.reason}).`,
-      }
+    if (arg === 'alerts on' || arg === 'alerts off') {
+      const isOn = arg === 'alerts on'
+      await $.store.set(STORE_ALERTS, isOn)
+      return { text: isOn ? `Alerts are on: a notification when a job of ${ALERT_AFTER_MS / 1000} seconds or more finishes, gets stuck or needs you.` : 'Alerts are off.' }
     }
     if (arg === 'on' || arg === 'off' || arg === 'full') {
       const isOn = arg === 'on'
@@ -114,7 +125,7 @@ export const register: Register = on => {
       await $.store.set(STORE_ON, isOn)
       return { text: isOn ? 'Clean View is on.' : 'Clean View is off. Everything Claude does is shown in full.' }
     }
-    return { text: 'Use /view details, /view colours, /view on or /view off.' }
+    return { text: 'Use /view on, /view off or /view alerts on|off.' }
   })
 
   on('prompt.submit', (_$, e, next) => {
@@ -317,6 +328,8 @@ export const register: Register = on => {
     })
 
     if (!shouldTick(written, !(await read($, isOffAtom)))) stopTicker()
+    const alert = written.startedAt !== null && now - written.startedAt >= ALERT_AFTER_MS ? alertText(written) : null
+    if (alert !== null && !(await read($, isOffAtom)) && (await $.store.get(STORE_ALERTS)) !== false) await alertPerson($, alert)
     if (written.phase === 'done') {
       const jobId = written.jobId
       $.clock.after(COLLAPSE_MS, () => {
@@ -333,14 +346,17 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const c = await read($, checklistAtom)
     if (e.props.hasSurvey || (await read($, isOffAtom)) || c.phase === 'idle' || c.startedAt === null) return next(e)
-    return drawBox($, e, c, c.startedAt, await read($, tickAtom), await next(e))
+    return drawBox($, e, c, { startedAt: c.startedAt, tick: await read($, tickAtom), helpers: await runningHelpers($), below: await next(e) })
   })
 
   // The colour legend and the Details pane.
-  on('ui.render', { component: 'Pane', requestId: COLOURS_PANE }, drawColours)
   on('ui.render', { component: 'Pane', requestId: DETAILS_PANE }, async ($, e) => {
-    const toggle = () => void update($, showsAllAtom, shown => !shown)
-    return drawDetails($, e, await read($, checklistAtom), await read($, showsAllAtom), toggle)
+    return drawDetails($, e, await read($, checklistAtom), {
+      showsAll: await read($, showsAllAtom),
+      errorsOnly: await read($, errorsOnlyAtom),
+      toggleAll: () => void update($, showsAllAtom, shown => !shown),
+      toggleErrors: () => void update($, errorsOnlyAtom, shown => !shown),
+    })
   })
 
 

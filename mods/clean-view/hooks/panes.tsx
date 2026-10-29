@@ -1,6 +1,6 @@
-// The two side panes: Details (every step, action and note of the job) and the colour legend.
+// The Details pane: every step, action and note of the job.
 
-import type { EngineInterface, RenderChildren } from 'claude-code'
+import type { EngineInterface } from 'claude-code'
 
 import type { Checklist, ChecklistAction } from '../types'
 import { detailGroups, isRunningPhase } from './checklist'
@@ -9,74 +9,37 @@ import type { RenderEvent } from './render'
 import { DETAILS_PANE, DETAILS_TITLE } from './state'
 import { formatDuration } from './text'
 
+/** The key of an action's row in Details, which the box's Show error button scrolls to. */
+const actionKey = (id: string) => `action-${id}`
+
 /**
- * Opens Details at its newest lines. The engine then keeps the bottom in view as the pane grows,
- * until the person scrolls; the next job asks again.
+ * Opens Details at its newest lines, or at one action (`actionId`). The engine keeps the bottom in view as the
+ * pane grows until the person scrolls; the next job asks again.
  */
-export async function openDetails($: EngineInterface) {
+export async function openDetails($: EngineInterface, actionId?: string) {
   const opened = await $.ui.open({ id: DETAILS_PANE, title: DETAILS_TITLE })
-  await followDetails($)
+  if (actionId === undefined) await followDetails($)
+  else await scrollDetails($, { to: { key: actionKey(actionId) }, block: 'center' })
   return opened
 }
 
-export async function followDetails($: EngineInterface) {
+async function scrollDetails($: EngineInterface, where: { to: 'end' | { key: string }; block?: 'center' }) {
   try {
-    await $.ui.scroll({ in: DETAILS_PANE, to: 'end' })
+    await $.ui.scroll({ in: DETAILS_PANE, ...where })
   } catch {
-    // No pane to move (not open, or a headless host): nothing to follow.
+    // No pane to move (not open, or a headless host): nothing to scroll.
   }
 }
 
-/** The colour legend: each frame colour the checklist uses, and when it shows. */
-export async function drawColours($: EngineInterface, e: RenderEvent<'Pane'>) {
-  const { Box, Text } = $.ui.resolve(e)
-  // One frame as the checklist draws it, with a line on when it appears.
-  const frame = (key: string, color: string, header: RenderChildren, when: string) => (
-    <Box key={key} flexDirection="column" borderStyle="round" borderColor={color} paddingX={1}>
-      {header}
-      <Text dimColor wrap="wrap">
-        {when}
-      </Text>
-    </Box>
-  )
-  return (
-    <Box flexDirection="column" gap={1}>
-      {frame(
-        'state-working',
-        PASTEL.working,
-        <Text bold color={PASTEL.working} wrap="wrap">{'✱ Working on your request'}</Text>,
-        'Orange: Claude is working through the steps.',
-      )}
-      {frame(
-        'state-waiting',
-        PASTEL.waiting,
-        <Text color={PASTEL.waiting} wrap="wrap">{'? Needs you · Claude is waiting for your reply'}</Text>,
-        'Blue: Claude asked you something, or needs an OK, and is waiting.',
-      )}
-      {frame(
-        'state-stuck',
-        PASTEL.stuck,
-        <Text color={PASTEL.stuck} wrap="wrap">{'⚠ Stuck: a step keeps failing'}</Text>,
-        'Yellow: a step keeps failing, you refused one, or an error stopped the job.',
-      )}
-      {frame(
-        'state-done',
-        PASTEL.done,
-        <Text color={PASTEL.done} wrap="wrap">{'✓ All done'}</Text>,
-        'Green: the job finished with nothing left to ask.',
-      )}
-      {frame(
-        'state-stopped',
-        PASTEL.stuck,
-        <Text color={PASTEL.stuck} wrap="wrap">{'■ Stopped · you pressed Esc'}</Text>,
-        'Yellow: you interrupted the job.',
-      )}
-    </Box>
-  )
+export function followDetails($: EngineInterface) {
+  return scrollDetails($, { to: 'end' })
 }
 
 /** The Details pane: every step of the job and every action under it, in full. */
-export async function drawDetails($: EngineInterface, e: RenderEvent<'Pane'>, c: Checklist, showsAll: boolean, toggle: () => void) {
+/** How Details is set: the person's two switches, and what pressing each does. */
+export type DetailsView = { showsAll: boolean; errorsOnly: boolean; toggleAll: () => void; toggleErrors: () => void }
+
+export async function drawDetails($: EngineInterface, e: RenderEvent<'Pane'>, c: Checklist, view: DetailsView) {
   const { Box, Text, Button } = $.ui.resolve(e)
   const now = await $.clock.now()
 
@@ -108,7 +71,7 @@ export async function drawDetails($: EngineInterface, e: RenderEvent<'Pane'>, c:
   const actionRow = (a: ChecklistAction) => {
     const result = a.output || a.note
     return (
-      <Box key={`action-${a.id}`} flexDirection="column" paddingLeft={2}>
+      <Box key={actionKey(a.id)} flexDirection="column" paddingLeft={2}>
         <Box flexDirection="row">
           <Box flexDirection="row" flexShrink={0}>
             <Text>{`${a.isHelper ? '🤖 ' : ''}${a.icon} ${a.label}`}</Text>
@@ -137,7 +100,7 @@ export async function drawDetails($: EngineInterface, e: RenderEvent<'Pane'>, c:
   // While the job runs, steps that finished cleanly fold to their heading, so what is happening now is
   // what shows; a finished job, and any step with an error, list everything.
   const canFold = isRunningPhase(c) && c.tasks.length > 0
-  const foldsFinished = canFold && !showsAll
+  const foldsFinished = canFold && !view.showsAll && !view.errorsOnly
   const groups = detailGroups(c).flatMap(group => {
     const isActive = group.status === 'active'
     const isUpcoming = group.status === 'upcoming'
@@ -153,6 +116,10 @@ export async function drawDetails($: EngineInterface, e: RenderEvent<'Pane'>, c:
         {facts !== '' && <Text dimColor>{`  ${facts}`}</Text>}
       </Box>
     )
+    if (view.errorsOnly) {
+      const errors = group.actions.filter(a => a.isFailed)
+      return errors.length === 0 ? [] : [head, ...errors.map(actionRow)]
+    }
     if (foldsFinished && group.status === 'done' && !group.actions.some(a => a.isFailed)) return [head]
     const notes = c.notes.filter(n => n.step === group.step)
     return [
@@ -175,9 +142,14 @@ export async function drawDetails($: EngineInterface, e: RenderEvent<'Pane'>, c:
       </Box>
       {groups}
       {/* At the bottom, where the pane follows the newest lines, so it stays in view. */}
-      {canFold && (
-        <Box key="clean-view-fold-row" marginTop={1}>
-          <Button key="clean-view-fold" label={showsAll ? 'Fold finished' : 'Show all'} onPress={toggle} />
+      {(canFold || failed > 0) && (
+        <Box key="clean-view-switches" flexDirection="row" flexWrap="wrap" gap={1} marginTop={1}>
+          {canFold && !view.errorsOnly && (
+            <Button key="clean-view-fold" label={view.showsAll ? 'Fold finished' : 'Show all'} onPress={view.toggleAll} />
+          )}
+          {failed > 0 && (
+            <Button key="clean-view-errors" label={view.errorsOnly ? 'All actions' : 'Errors only'} onPress={view.toggleErrors} />
+          )}
         </Box>
       )}
     </Box>

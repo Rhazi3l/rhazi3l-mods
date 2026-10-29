@@ -12,7 +12,12 @@ import { MAX_NAME, formatDuration, trimToWidth } from './text'
 import { openDetails } from './panes'
 
 /** Draws the checklist for a job that has started (`startedAt`; `tick` moves the bars), above whatever the engine draws there (`below`). */
-export async function drawBox($: EngineInterface, e: RenderEvent<'AbovePrompt'>, c: Checklist, startedAt: number, tick: number, below: RenderElement) {
+export async function drawBox(
+  $: EngineInterface,
+  e: RenderEvent<'AbovePrompt'>,
+  c: Checklist,
+  { startedAt, tick, helpers, below }: { startedAt: number; tick: number; helpers: number; below: RenderElement },
+) {
   const ui = $.ui.resolve(e)
   const { Box, Text, Button } = ui
   const now = await $.clock.now()
@@ -26,8 +31,11 @@ export async function drawBox($: EngineInterface, e: RenderEvent<'AbovePrompt'>,
   // Where the surface can draw an image, bars are drawn as one, centred in their row (see barSvg).
   const Svg = !isTerminal && 'Svg' in ui ? ui.Svg : undefined
 
+  // A stuck job points at what went wrong: the last action that failed.
+  const failedAction = c.phase === 'stuck' ? c.actions.findLast(a => a.isFailed && !a.isHelper) : undefined
   const buttons = (
     <Box key="clean-view-buttons" flexDirection="row" flexShrink={0}>
+      {failedAction && <Button key="clean-view-error" label="Show error" onPress={() => openDetails($, failedAction.id)} />}
       <Button
         key="clean-view-details"
         label="Details"
@@ -57,8 +65,9 @@ export async function drawBox($: EngineInterface, e: RenderEvent<'AbovePrompt'>,
     </Box>
   ) : (
     <Box flexDirection="row" flexShrink={1}>
-      <Box flexShrink={0}>
+      <Box flexDirection="row" flexShrink={0}>
         <Text bold color={PASTEL.working}>{c.tasks.length === 0 ? '✱ Working…' : `✱ ${DEFAULT_TITLE}`}</Text>
+        {c.tasks.length > 1 && <Text dimColor>{` · ${c.tasks.filter(t => t.status === 'done').length} of ${c.tasks.length}`}</Text>}
       </Box>
       {noteBesideTitle && (
         <Box flexShrink={1} marginLeft={1}>
@@ -99,6 +108,7 @@ export async function drawBox($: EngineInterface, e: RenderEvent<'AbovePrompt'>,
         {header}
       </Box>
       <Box flexDirection="row" flexShrink={0}>
+        {helpers > 0 && <Text dimColor>{`🤖 ${helpers} helper${helpers === 1 ? '' : 's'}  `}</Text>}
         <Text dimColor>{`${c.phase === 'done' ? `took ${elapsed}` : elapsed}  `}</Text>
         {buttons}
       </Box>

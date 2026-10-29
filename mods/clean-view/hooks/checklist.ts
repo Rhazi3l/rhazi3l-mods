@@ -1,7 +1,7 @@
 // The checklist as a value: every change to a job is a pure function from one Checklist to the next.
 
 import type { Checklist, ChecklistAction, ChecklistTask } from '../types'
-import { DEFAULT_TITLE } from './state'
+import { DEFAULT_TITLE, REASON_REPLY, STUCK_FAILING } from './state'
 import { cleanName, clipOutput, extractQuestion, quickReplies } from './text'
 
 const MAX_ACTIONS = 300
@@ -105,6 +105,14 @@ export function recordNote(c: Checklist, id: string, text: string): Checklist {
   const step = currentStep(c)
   const note = { id, text, step, before: c.actions.filter(a => a.step === step).length }
   return { ...c, notes: [...c.notes, note].slice(-100) }
+}
+
+/** What to tell the person when a job ends where it needs them, or null when there is nothing to say (a stop they asked for). */
+export function alertText(c: Checklist): string | null {
+  if (c.phase === 'done') return c.tasks.length > 0 ? `All done · ${c.tasks.length} step${c.tasks.length === 1 ? '' : 's'}` : 'All done'
+  if (c.phase === 'needsYou') return c.question !== '' ? c.question.slice(0, 200) : `Needs you · ${c.needsYouReason ?? REASON_REPLY}`
+  if (c.phase === 'stuck') return `Stuck: ${c.stuckReason ?? STUCK_FAILING}`
+  return null
 }
 
 /** Notes when each step began and ended, as the plan moves on. */

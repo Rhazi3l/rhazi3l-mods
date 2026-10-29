@@ -75,6 +75,8 @@ declare module 'claude-code' {
       narration: string[]
       /** Whether Details lists finished steps in full while a job runs, which it otherwise folds. */
       showsAll: boolean
+      /** Whether Details lists only the actions that failed. */
+      errorsOnly: boolean
     }
   }
 }

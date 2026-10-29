@@ -7,8 +7,6 @@ import type { Checklist } from '../types'
 export const DEFAULT_TITLE = 'Working on your request'
 export const DETAILS_PANE = 'clean-view-details'
 export const DETAILS_TITLE = 'What Claude did'
-export const COLOURS_PANE = 'clean-view-colours'
-export const COLOURS_TITLE = 'Frame colours'
 
 export const REASON_PERMISSION = 'Claude needs your OK to continue'
 export const REASON_QUESTION = 'Claude has a question for you'
@@ -36,3 +34,4 @@ export const EMPTY: Checklist = {
 }
 
 export const STORE_ON = 'isOn'
+export const STORE_ALERTS = 'alertsOn'

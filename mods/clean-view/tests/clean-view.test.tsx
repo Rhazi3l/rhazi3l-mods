@@ -55,7 +55,7 @@ const submitted: string[] = []
 
 /** The engine's own answers beneath the plugin. */
 async function startSession($: Engine, on: On) {
-  mock.clock(on, { now: 1_000_000 })
+  const clock = mock.clock(on, { now: 1_000_000 })
   mock.store(on)
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   submitted.length = 0
@@ -71,6 +71,7 @@ async function startSession($: Engine, on: On) {
     return <Box />
   })
   await $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+  return clock
 }
 
 /** The to-do list the checklist follows: the first `done` steps completed, the next one in progress. */
@@ -86,9 +87,10 @@ const todo = ($: Engine, names: string[], done = 0) =>
 
 /** A session with one job running. */
 async function startJob($: Engine, on: On) {
-  await startSession($, on)
+  const clock = await startSession($, on)
   await $.prompt.submit({ text: 'Build my landing page', wait: false, origin: RUN.origin })
   await $.turn.start({ text: 'Build my landing page', turnId: 't1' })
+  return clock
 }
 
 describe('plain names', () => {
@@ -493,6 +495,70 @@ describe('checklist', () => {
     await whole.unmount()
   })
 
+  test('the header counts the steps done, and a helper at work gets a light', async ($, on) => {
+    on('agent.list', () => ({ value: [{ id: 'a1', status: 'running', description: 'Count', type: 'Explore' }] }) as never)
+    await startJob($, on)
+    await todo($, ['Read your notes', 'Build the site', 'Polish it'], 1)
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect(await ui.find({ type: 'Text', text: ' · 1 of 3' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /🤖 1 helper/ })).toBeDefined()
+      await ui.unmount()
+    }
+  })
+
+  test('a stuck job offers Show error, which opens Details at the failed action', async ($, on) => {
+    on('ui.open', () => ({ value: { isPlaced: true } }))
+    on('tool.call', { tool: 'Bash' }, () => ({ result: 'failed', isError: true, text: 'bash: hugo: command not found' }) as never)
+    await startJob($, on)
+    await todo($, ['Read your notes', 'Write the page'])
+    const before = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await before.find({ key: 'clean-view-error' })).toBeUndefined()
+    await before.unmount()
+    for (let i = 0; i < 3; i++) await $.tool.call({ tool: 'Bash', command: 'hugo build', description: 'Build the site' })
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await ui.find({ key: 'clean-view-error' })).toBeDefined()
+    await ui.press({ key: 'clean-view-error' })
+    await ui.unmount()
+  })
+
+  test('Errors only keeps the failed actions and All actions brings the rest back', async ($, on) => {
+    on('tool.call', { tool: 'Bash' }, () => ({ result: 'failed', isError: true, text: 'bash: hugo: command not found' }) as never)
+    await startJob($, on)
+    await todo($, ['Read your notes', 'Build the site'])
+    await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/brand.md' })
+    await $.tool.call({ tool: 'Bash', command: 'hugo build', description: 'Build the site' })
+    await $.turn.complete({ turnId: 't1', answer: 'Done.', reason: 'answer' } as never)
+    const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    expect(await pane.find({ type: 'Text', text: '/tmp/notes/brand.md' })).toBeDefined()
+    await pane.press({ key: 'clean-view-errors' })
+    expect(await pane.find({ type: 'Text', text: '/tmp/notes/brand.md' })).toBeUndefined()
+    expect(await pane.find({ type: 'Text', text: 'bash: hugo: command not found' })).toBeDefined()
+    await pane.press({ key: 'clean-view-errors' })
+    expect(await pane.find({ type: 'Text', text: '/tmp/notes/brand.md' })).toBeDefined()
+    await pane.unmount()
+  })
+
+  test('a long job that ends where it needs you sends one alert, a short one none, and /view alerts off silences it', async ($, on) => {
+    const told: string[] = []
+    on('ui.notify', (_$, e) => ({ value: (told.push(e.text), { isSent: true, channel: 'kitty' }) }) as never)
+    const clock = await startJob($, on)
+    await clock.advance(30_000)
+    await $.turn.complete({ turnId: 't1', answer: 'All done.', reason: 'answer' } as never)
+    expect(told).toEqual(['All done'])
+
+    await $.turn.start({ text: 'A quick one', turnId: 't2' })
+    await clock.advance(5_000)
+    await $.turn.complete({ turnId: 't2', answer: 'Done.', reason: 'answer' } as never)
+    expect(told).toHaveLength(1)
+
+    await $.command.run({ command: 'view', args: 'alerts off', ...RUN })
+    await $.turn.start({ text: 'A long one', turnId: 't3' })
+    await clock.advance(30_000)
+    await $.turn.complete({ turnId: 't3', answer: 'Done.', reason: 'answer' } as never)
+    expect(told).toHaveLength(1)
+  })
+
   test('the spinner line is cut to its word once a plan exists, on the terminal only', async ($, on) => {
     const SPINNER = { plugin: 'clean-view', component: 'Spinner', props: { word: 'Fermenting', message: null, suffix: '…', mode: 'responding' } } as const
     on('ui.render', { component: 'Spinner' }, ($, e) => {
@@ -530,9 +596,9 @@ describe('checklist', () => {
       expect(await ui.find({ key: 'clean-view-details' })).toBeDefined()
       await ui.unmount()
     }
-    // The old Simple and Guided picks are gone: /view says what is left.
+    // Anything but on, off and the alerts switch gets told what is left.
     const gone = await $.command.run({ command: 'view', args: 'simple', ...RUN })
-    expect(JSON.stringify(gone)).toContain('/view details')
+    expect(JSON.stringify(gone)).toContain('/view on')
   })
 
   test('Details shows what each tool answered, whole for a failure and cut when very long', async ($, on) => {
@@ -578,9 +644,6 @@ describe('checklist', () => {
     const whole = await $.ui.mount({ ...PANE, surface: 'terminal' })
     expect(await whole.find({ type: 'Text', text: '/tmp/notes/brand.md' })).toBeDefined()
     await whole.unmount()
-
-    const opened = await $.command.run({ command: 'view', args: 'details', ...RUN })
-    expect(opened.text).toContain('Details open')
 
     // Details shows everything in its own pane; the transcript stays clean.
     const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
@@ -668,48 +731,6 @@ describe('replying to a question', () => {
 })
 
 describe('frame colours', () => {
-  const LEGEND = { ...PANE, requestId: 'clean-view-colours' } as const
-
-  test('/view colours opens a legend of every frame colour and when it shows, with nothing to pick', async ($, on) => {
-    on('ui.open', () => ({ value: { isPlaced: true } }))
-    await startJob($, on)
-    expect((await $.command.run({ command: 'view', args: 'colours', ...RUN })).text).toContain('Frame colours open')
-    for (const surface of SURFACES) {
-      const pane = await $.ui.mount({ ...LEGEND, surface })
-      expect(await pane.find({ key: 'state-working' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.working } })
-      expect(await pane.find({ key: 'state-waiting' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.waiting } })
-      expect(await pane.find({ key: 'state-stuck' })).toMatchObject({ props: { borderColor: PASTEL.stuck } })
-      expect(await pane.find({ key: 'state-done' })).toMatchObject({ props: { borderColor: PASTEL.done } })
-      expect(await pane.find({ key: 'state-stopped' })).toMatchObject({ props: { borderColor: PASTEL.stuck } })
-      expect(await pane.find({ type: 'Text', text: /^Blue: Claude asked you something/ })).toBeDefined()
-      expect(await pane.find({ type: 'Text', text: /^Yellow: a step keeps failing/ })).toBeDefined()
-      expect(await pane.find({ type: 'Button' })).toBeUndefined()
-      await pane.unmount()
-    }
-  })
-
-  test('every frame colour has its own icon, in plain coloured text with no background chip', async ($, on) => {
-    on('ui.open', () => ({ value: { isPlaced: true } }))
-    await startJob($, on)
-    for (const surface of SURFACES) {
-      const pane = await $.ui.mount({ ...LEGEND, surface })
-      const icons: [string, RegExp, string][] = [
-        ['state-working', /^✱ /, PASTEL.working],
-        ['state-waiting', /^\? /, PASTEL.waiting],
-        ['state-stuck', /^⚠ /, PASTEL.stuck],
-        ['state-done', /^✓ /, PASTEL.done],
-        ['state-stopped', /^■ /, PASTEL.stuck],
-      ]
-      for (const [key, icon, colour] of icons) {
-        const frame = await pane.find({ key })
-        expect(frame?.text).toMatch(icon)
-        expect(JSON.stringify(frame)).toContain(`"color":"${colour}"`)
-        expect(JSON.stringify(frame)).not.toContain('backgroundColor')
-      }
-      await pane.unmount()
-    }
-  })
-
   test('the checklist frame uses the same pastel for each state', async ($, on) => {
     await startJob($, on)
     await todo($, ['Read your notes', 'Write the page'])
