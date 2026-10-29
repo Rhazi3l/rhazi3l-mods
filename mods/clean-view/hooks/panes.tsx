@@ -172,13 +172,14 @@ export async function drawDetails($: EngineInterface, e: RenderEvent<'Pane'>, c:
           </Text>
           <Text dimColor>{`  ${summary}`}</Text>
         </Box>
-        {canFold && (
-          <Box flexShrink={0}>
-            <Button key="clean-view-fold" label={showsAll ? 'Fold finished' : 'Show all'} onPress={toggle} />
-          </Box>
-        )}
       </Box>
       {groups}
+      {/* At the bottom, where the pane follows the newest lines, so it stays in view. */}
+      {canFold && (
+        <Box key="clean-view-fold-row" marginTop={1}>
+          <Button key="clean-view-fold" label={showsAll ? 'Fold finished' : 'Show all'} onPress={toggle} />
+        </Box>
+      )}
     </Box>
   )
 }
