@@ -144,7 +144,7 @@ function setStuck(c: Checklist, reason: string): Checklist {
 
 // ---------- Small helpers (no engine calls) ----------
 
-const shouldTick = (c: Checklist, mode: ViewMode) => mode !== 'full' && (c.phase === 'working' || c.phase === 'needsYou')
+const shouldTick = (c: Checklist, mode: ViewMode) => mode !== 'full' && (c.phase === 'working' || c.phase === 'needsYou' || c.phase === 'stuck')
 
 function stopTicker() {
   ticker?.cancel()
@@ -569,7 +569,7 @@ export const register: Register = on => {
       )
     }
 
-    const showsTime = c.phase === 'working' || c.phase === 'needsYou' || c.phase === 'done'
+    const showsTime = c.phase !== 'idle'
     const headerRow = (
       <Box key="clean-view-header" flexDirection="row" justifyContent="space-between" flexWrap={isTerminal ? 'nowrap' : 'wrap'}>
         <Box flexGrow={1} flexShrink={1}>

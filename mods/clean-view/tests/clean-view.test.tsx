@@ -211,6 +211,23 @@ describe('checklist', () => {
     }
   })
 
+  test('a stuck or stopped frame keeps its time at the right', async ($, on) => {
+    on('tool.call', { tool: 'Bash' }, () => ({ result: 'failed', isError: true, text: 'bash: hugo: command not found' }) as never)
+    await startJob($, on)
+    await todo($, ['Read your notes', 'Write the page'])
+    for (let i = 0; i < 3; i++) await $.tool.call({ tool: 'Bash', command: 'hugo build', description: 'Build the site' })
+    const stuck = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await stuck.find({ type: 'Text', text: /^⚠ Stuck/ })).toBeDefined()
+    expect(await stuck.find({ type: 'Text', text: /^\d+s {2}$/ })).toBeDefined()
+    await stuck.unmount()
+
+    await $.turn.complete({ turnId: 't1', answer: '', reason: 'aborted' } as never)
+    const stopped = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await stopped.find({ type: 'Text', text: /^■ Stopped/ })).toBeDefined()
+    expect(await stopped.find({ type: 'Text', text: /^\d+s {2}$/ })).toBeDefined()
+    await stopped.unmount()
+  })
+
   test('a finished job keeps its time at the right, outside the title', async ($, on) => {
     await startJob($, on)
     await todo($, ['Read your notes'], 1)
