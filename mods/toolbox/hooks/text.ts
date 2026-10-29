@@ -1,7 +1,7 @@
 // Plain words for the toolbox: model names and the choices it offers.
 
-/** Model aliases the toolbox offers, as /model takes them. */
-export const MODELS = ['opus', 'sonnet', 'haiku', 'fable'] as const
+/** Model aliases the toolbox offers, as /model takes them, cheapest per token on the left (Haiku, Sonnet, Opus, Fable). */
+export const MODELS = ['haiku', 'sonnet', 'opus', 'fable'] as const
 
 /** Effort levels, lowest first, as /effort takes them. */
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
@@ -20,4 +20,12 @@ export function prettyModel(model: string): string {
 /** The alias of the family `model` belongs to, or null. */
 export function modelAlias(model: string): string | null {
   return FAMILY.exec(model)?.[1]?.toLowerCase() ?? null
+}
+
+/** Advisor models the toolbox offers, as /advisor takes them, in the same order; `off` turns it off. */
+export const ADVISORS = MODELS
+
+/** `max` → `Max`: the first letter in capitals, to match the model names. */
+export function capitalise(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1)
 }

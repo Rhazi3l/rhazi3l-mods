@@ -1,7 +1,7 @@
 {
   "name": "toolbox",
-  "version": "1.4.2",
-  "description": "A corner toolbox under the prompt for the model, effort and your other mods.",
+  "version": "1.5.1",
+  "description": "A corner toolbox under the prompt for the model, effort, advisor and your other mods.",
   "author": {
     "name": "Rhazi3l"
   },

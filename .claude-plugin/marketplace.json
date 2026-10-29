@@ -8,7 +8,7 @@
     {
       "name": "toolbox",
       "source": "./mods/toolbox",
-      "description": "An Info button under the prompt (the toolbox) for the model, effort and your other mods."
+      "description": "An Info button under the prompt (the toolbox) for the model, effort, advisor and your other mods."
     },
     {
       "name": "clean-view",

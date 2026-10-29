@@ -5,12 +5,18 @@ export type ToolboxInfo = {
   effort: string | null
 }
 
+export type AdvisorInfo = {
+  /** The advisor model from settings (`advisorModel`), or null when none is set. */
+  model: string | null
+}
+
 declare module 'claude-code' {
   interface PluginState {
     toolbox: {
       /** Whether the toolbox panel above the prompt is open. */
       toolboxOpen: boolean
       toolboxInfo: ToolboxInfo
+      advisorInfo: AdvisorInfo
     }
     /**
      * Read only: owned and written by the Clean View mod. Undefined means it

@@ -1,19 +1,22 @@
 // Info: a "✦ Info ▾" button at the right of the prompt footer that
-// opens a small panel in the corner above it for the model, effort and the
-// other mods that are installed. Usage figures belong in Claude Code's own
-// status line setting, not here.
+// opens a small panel in the corner above it for the model, effort, the advisor
+// and the other mods that are installed. Usage figures and the prompt cache's
+// warm or cold belong in Claude Code's own status line setting, not here.
 // Colours are theme keys, so they follow Claude Code's theme (custom:omarchy).
 
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { ToolboxInfo } from '../types'
+import type { AdvisorInfo, ToolboxInfo } from '../types'
 import { PASTEL } from './palette'
-import { EFFORTS, MODELS, modelAlias, prettyModel } from './text'
+import { ADVISORS, EFFORTS, MODELS, capitalise, modelAlias, prettyModel } from './text'
 
 const toolboxOpenAtom = atom({ plugin: 'toolbox', key: 'toolboxOpen' } as const, false)
 const EMPTY_INFO: ToolboxInfo = { model: '', effort: null }
 const toolboxInfoAtom = atom({ plugin: 'toolbox', key: 'toolboxInfo' } as const, EMPTY_INFO)
+
+const EMPTY_ADVISOR: AdvisorInfo = { model: null }
+const advisorInfoAtom = atom({ plugin: 'toolbox', key: 'advisorInfo' } as const, EMPTY_ADVISOR)
 
 const LABEL_WIDTH = 8
 const INSTALL_HINT = 'Clean View: `/plugin install clean-view --marketplace Rhazi3l/rhazi3l-mods`, Better: `/plugin install prompt-upgrade --marketplace Rhazi3l/rhazi3l-mods`'
@@ -67,6 +70,15 @@ function findMod(query: string): SiblingMod | undefined {
   return SIBLINGS.find(mod => mod.id === wanted || mod.name.toLowerCase().replace(/\s+/g, '-') === wanted)
 }
 
+async function readAdvisor($: EngineInterface) {
+  try {
+    const model = await $.settings.read({ key: 'advisorModel' })
+    await update($, advisorInfoAtom, now => ({ ...now, model: typeof model === 'string' && model !== '' ? model : null }))
+  } catch {
+    // Settings can't be read (a headless host).
+  }
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     try {
@@ -86,6 +98,7 @@ export const register: Register = on => {
     }
 
     const started = await next(e)
+    await readAdvisor($)
     try {
       const model = await $.session.model()
       const saved = (await $.settings.read()).effortLevel
@@ -179,6 +192,8 @@ export const register: Register = on => {
     const info = await read($, toolboxInfoAtom)
     const installed = await installedMods($)
     const currentModel = modelAlias(info.model)
+    const advisor = await read($, advisorInfoAtom)
+    const currentAdvisor = advisor.model ? modelAlias(advisor.model) : null
     // Laid out by boxes, not padded text: the desktop app draws a wider font and
     // native buttons, so its rows wrap instead of running into each other.
     const label = (text: string) => (
@@ -186,6 +201,16 @@ export const register: Register = on => {
         <Text dimColor>{text}</Text>
       </Box>
     )
+    const setAdvisor = async (choice: string) => {
+      try {
+        await $.command.run({ command: 'advisor', args: choice })
+        await readAdvisor($)
+        // Settings may not have caught up yet; show the choice meanwhile.
+        await update($, advisorInfoAtom, now => ({ ...now, model: choice === 'off' ? null : now.model ?? choice }))
+      } catch {
+        $.ui.toast(`Couldn't set the advisor to ${choice}.`)
+      }
+    }
     const buttons = (children: RenderChildren) => (
       <Box flexDirection="row" flexWrap="wrap" flexShrink={1}>
         {children}
@@ -258,7 +283,7 @@ export const register: Register = on => {
               EFFORTS.map(level => (
                 <Button
                   key={`effort-${level}`}
-                  label={level}
+                  label={capitalise(level)}
                   variant={level === info.effort ? 'primary' : 'secondary'}
                   onPress={async () => {
                     try {
@@ -271,6 +296,25 @@ export const register: Register = on => {
                 />
               )),
             )}
+          </Box>
+          <Box key="toolbox-advisor" flexDirection="row">
+            {label('Advisor')}
+            {buttons([
+              ...ADVISORS.map(alias => (
+                <Button
+                  key={`advisor-${alias}`}
+                  label={prettyModel(alias)}
+                  variant={alias === currentAdvisor ? 'primary' : 'secondary'}
+                  onPress={() => setAdvisor(alias)}
+                />
+              )),
+              <Button
+                key="advisor-off"
+                label="Off"
+                variant={advisor.model === null ? 'primary' : 'secondary'}
+                onPress={() => setAdvisor('off')}
+              />,
+            ])}
           </Box>
           {installed.length > 0 && (
             <Box key="toolbox-mods" flexDirection="row">

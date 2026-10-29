@@ -2,7 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { Engine, MockClock } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
-import { modelAlias, prettyModel } from '../hooks/text'
+import { capitalise, modelAlias, prettyModel } from '../hooks/text'
 
 const NOW = Date.parse('2026-10-14T10:00:00Z')
 const SURFACES = ['terminal', 'desktop'] as const
@@ -72,6 +72,51 @@ describe('toolbox words', () => {
     expect(prettyModel('claude-sonnet-5-5[1m]')).toBe('Sonnet 5.5')
     expect(prettyModel('haiku')).toBe('Haiku')
     expect(modelAlias('claude-fable-5-1')).toBe('fable')
+  })
+})
+
+/** The engine's answers about the session's model and advisor, and the /advisor command. */
+function fakeChat(on: On, ran: string[]) {
+  on('session.model', () => ({ value: 'claude-sonnet-5-5' }) as never)
+  on('settings.read', () => ({ value: { advisorModel: 'opus' } }) as never)
+  on('command.run', { command: 'advisor' }, ($, e) => (ran.push(`advisor ${e.args}`), { text: 'ok' }))
+}
+
+describe('button order and words', () => {
+  test('models and advisors run cheapest to dearest, and efforts are capitalised', async ($, on) => {
+    fakeChat(on, [])
+    await startSession($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
+    const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    for (const row of ['model', 'advisor']) {
+      const tree = JSON.stringify(await band.find({ key: `toolbox-${row}` }))
+      const at = ['haiku', 'sonnet', 'opus', 'fable'].map(alias => tree.indexOf(`${row}-${alias}"`))
+      expect(at.every(i => i > -1)).toBe(true)
+      expect([...at].sort((a, b) => a - b)).toEqual(at)
+    }
+    expect(await band.find({ key: 'effort-max' })).toMatchObject({ props: { label: 'Max' } })
+    expect(await band.find({ key: 'effort-xhigh' })).toMatchObject({ props: { label: capitalise('xhigh') } })
+    await band.unmount()
+  })
+})
+
+describe('advisor', () => {
+  test('the panel shows the advisor and its buttons run /advisor', async ($, on) => {
+    const ran: string[] = []
+    fakeChat(on, ran)
+    await startSession($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
+    for (const surface of SURFACES) {
+      const band = await $.ui.mount({ ...BAND, surface })
+      expect(await band.find({ key: 'advisor-opus' })).toMatchObject({ props: { variant: 'primary' } })
+      expect(await band.find({ key: 'advisor-off' })).toMatchObject({ props: { variant: 'secondary' } })
+      expect(await band.find({ type: 'Text', text: /advises/ })).toBeUndefined()
+      await band.unmount()
+    }
+    const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    await band.press({ key: 'advisor-off' })
+    expect(ran).toEqual(['advisor off'])
+    await band.unmount()
   })
 })
 
