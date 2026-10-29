@@ -249,14 +249,16 @@ export function describeFull(tool: string, input: unknown): string {
 
 /** A tool's answer kept for the Details pane: the head of it, with a note of what was cut. */
 const OUTPUT_MAX = 4000
+/** The tags Claude Code wraps around a refused call's reason, which are not for the person to read. */
+const stripWrapper = (text: unknown) => String(text ?? '').replace(/<\/?tool_use_error>/g, '')
 export function clipOutput(text: unknown, max = OUTPUT_MAX): string {
-  const whole = String(text ?? '').replace(/\s+$/, '')
+  const whole = stripWrapper(text).replace(/\s+$/, '')
   return whole.length <= max ? whole : `${whole.slice(0, max)}\n… ${whole.length - max} more characters`
 }
 
 /** The first line of an error, for a failed action. */
 export function firstLine(text: unknown, max = 160): string {
-  const line = String(text ?? '').split('\n').find(part => part.trim() !== '') ?? ''
+  const line = stripWrapper(text).split('\n').find(part => part.trim() !== '') ?? ''
   return oneLine(line, max)
 }
 

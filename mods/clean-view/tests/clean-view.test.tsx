@@ -476,6 +476,37 @@ describe('checklist', () => {
     await after.unmount()
   })
 
+  test('a note leaves the header once the step it opened has finished', async ($, on) => {
+    on('turn.step', async function* (_$, e) {
+      const answer = e.index === 0 ? 'Now the second step.' : ''
+      return { turnId: e.turnId, index: e.index, answer, toolUses: e.index === 0 ? [{ id: 'u1', name: 'TodoWrite', input: {} }] : [], stopReason: null } as never
+    })
+    await startJob($, on)
+    const steps = ['First step', 'Second step', 'Third step']
+    await todo($, steps)
+    for await (const _chunk of $.turn.step({ turnId: 't1', index: 0, model: 'm', messageCount: 1 } as never)) void _chunk
+    await todo($, steps, 1)
+    for await (const _chunk of $.turn.step({ turnId: 't1', index: 1, model: 'm', messageCount: 3 } as never)) void _chunk
+    const during = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await during.find({ type: 'Text', text: /Now the second step/ })).toBeDefined()
+    await during.unmount()
+    await todo($, steps, 2)
+    const after = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await after.find({ type: 'Text', text: /Now the second step/ })).toBeUndefined()
+    await after.unmount()
+  })
+
+  test('a refused call shows its reason in Details without the wrapper tags', async ($, on) => {
+    on('tool.call', { tool: 'Bash' }, () => ({ result: 'failed', isError: true, text: '<tool_use_error>Blocked: sleep 25</tool_use_error>' }) as never)
+    await startJob($, on)
+    await todo($, ['Read your notes', 'Write the page'])
+    await $.tool.call({ tool: 'Bash', command: 'sleep 25', description: 'Wait' })
+    const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    expect(await pane.find({ type: 'Text', text: /Blocked: sleep 25/ })).toBeDefined()
+    expect(JSON.stringify(await pane.find({ type: 'Text', text: /Blocked: sleep 25/ }))).not.toContain('tool_use_error')
+    await pane.unmount()
+  })
+
   test('Show all opens the finished steps while the job runs, and Fold finished closes them again', async ($, on) => {
     await startJob($, on)
     await todo($, ['Read your notes', 'Build the site'])

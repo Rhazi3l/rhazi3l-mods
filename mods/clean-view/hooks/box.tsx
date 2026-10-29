@@ -4,7 +4,7 @@ import type { EngineInterface, RenderChildren, RenderElement } from 'claude-code
 
 import type { Checklist } from '../types'
 import { BAR_BOX_PX, BAR_CELL_PX, LABEL_CELLS, METER, barSvg, meterCells, meterRuns, stepWindow } from './bars'
-import { firstSentence } from './checklist'
+import { currentStep, firstSentence } from './checklist'
 import { PASTEL } from './palette'
 import type { RenderEvent } from './render'
 import { DEFAULT_TITLE, REASON_REPLY, STUCK_FAILING } from './state'
@@ -49,7 +49,10 @@ export async function drawBox(
   const doing = c.tasks.length === 0 ? c.actions.findLast(a => !a.isHelper) : undefined
   // The latest thing Claude said between tool calls, which the transcript no longer shows. It sits beside
   // the title while steps are running, and on a line of its own where the header has no room for it.
-  const note = c.phase === 'working' || c.phase === 'stuck' ? c.notes.at(-1) : undefined
+  // A note from a step that has since finished is old news, so it goes when the plan moves on.
+  const lastNote = c.notes.at(-1)
+  const isCurrent = lastNote !== undefined && (c.tasks.length === 0 || lastNote.step === currentStep(c))
+  const note = (c.phase === 'working' || c.phase === 'stuck') && isCurrent ? lastNote : undefined
   const noteBesideTitle = note !== undefined && c.phase === 'working' && c.tasks.length > 0
   let header = doing ? (
     <Box flexDirection="row" flexShrink={1}>
