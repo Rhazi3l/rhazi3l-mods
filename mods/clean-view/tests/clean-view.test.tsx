@@ -231,7 +231,9 @@ describe('checklist', () => {
     await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/colours.md' })
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
-      expect(await ui.find({ key: 'clean-view-trail' })).toMatchObject({ text: expect.stringMatching(/↳ 📄 colours\.md · 2 actions/) })
+      // Off the terminal the action sits on the step's own row; the terminal keeps it on a line below.
+      const mark = surface === 'terminal' ? '↳' : '·'
+      expect(await ui.find({ key: 'clean-view-trail' })).toMatchObject({ text: expect.stringMatching(new RegExp(`${mark} 📄 colours\\.md · 2 actions`)) })
       expect(await ui.find({ key: 'clean-view-details' })).toBeDefined()
       await ui.unmount()
     }

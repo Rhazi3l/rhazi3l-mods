@@ -1,7 +1,7 @@
 // Clean View: a calm checklist above the prompt in place of the technical
 // tool rows, which it hides from the transcript.
 //
-// Views: Simple shows the checklist alone, Guided adds the latest action under
+// Views: Simple shows the checklist alone, Guided adds the latest action on
 // the step in progress. The Details pane lists every step and every action of
 // the job in full, and can bring the engine's own tool rows back. Full (Clean
 // View off) leaves Claude Code as it is.
@@ -776,6 +776,11 @@ export const register: Register = on => {
             : i === firstUpcoming
               ? 'Next'
               : 'Up next'
+      const count = c.actions.filter(a => a.step === task.name).length
+      const hasTrail = isActive && showsTrail && latest !== undefined
+      // Off the terminal the latest action sits on the step's own row, after its name; the terminal's fixed columns keep it on a line below.
+      const trailInline = hasTrail && !isTerminal
+      const trailText = latest ? `${latest.icon} ${latest.detail || latest.label}` : ''
       const row = (
         <Box key={`task-${task.id}`} flexDirection="row" alignItems="center">
           <Text color={task.status === 'done' ? PASTEL.done : isActive ? PASTEL.working : undefined} dimColor={task.status === 'upcoming'}>
@@ -785,6 +790,13 @@ export const register: Register = on => {
             <Text bold={isActive} dimColor={!isActive} wrap="truncate-end">
               {trimToWidth(task.name, nameWidth)}
             </Text>
+            {trailInline && latest && (
+              <Box key="clean-view-trail" flexDirection="row" flexShrink={1} marginLeft={1}>
+                <Text dimColor wrap="truncate-end">{`· ${trailText}`}</Text>
+                {latest.isFailed && <Text color={PASTEL.error}>{" · didn't work"}</Text>}
+                {count > 1 && <Text dimColor>{` · ${count} actions`}</Text>}
+              </Box>
+            )}
           </Box>
           <Box key="meter" flexDirection="row" flexShrink={0}>
             {Svg ? (
@@ -808,12 +820,11 @@ export const register: Register = on => {
           </Box>
         </Box>
       )
-      if (!isActive || !showsTrail || !latest) return [row]
-      const count = c.actions.filter(a => a.step === task.name).length
+      if (!hasTrail || trailInline || !latest) return [row]
       return [
         row,
         <Box key="clean-view-trail" flexDirection="row" paddingLeft={2}>
-          <Text dimColor wrap="truncate-end">{`↳ ${latest.icon} ${latest.detail || latest.label}`}</Text>
+          <Text dimColor wrap="truncate-end">{`↳ ${trailText}`}</Text>
           {latest.isFailed && <Text color={PASTEL.error}>{" · didn't work"}</Text>}
           {count > 1 && <Text dimColor>{` · ${count} actions`}</Text>}
         </Box>,
