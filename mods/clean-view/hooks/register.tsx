@@ -71,6 +71,7 @@ const COLOURS_PANE = 'clean-view-colours'
 const isOnAtom = atom({ plugin: 'clean-view', key: 'isOn' } as const, true)
 const checklistAtom = atom({ plugin: 'clean-view', key: 'checklist' } as const, EMPTY)
 const tickAtom = atom({ plugin: 'clean-view', key: 'tick' } as const, 0)
+const narrationAtom = atom({ plugin: 'clean-view', key: 'narration' } as const, [] as string[])
 
 /** The view in force: guided, or `full` while Clean View is off. */
 const modeAtom = derive([isOnAtom], (isOn): ViewMode => (isOn ? 'guided' : 'full'))
@@ -968,6 +969,27 @@ export const register: Register = on => {
     const { from, task } = e.props
     const isPlumbing = from !== undefined || (task !== undefined && task.status !== 'failed' && task.status !== 'killed')
     if (!isPlumbing) return next(e)
+    const { Box } = $.ui.resolve(e)
+    return <Box />
+  })
+
+  // What Claude writes between tool calls ("Now the fix for...") is narration: the answer is
+  // the text of a step that calls no tool. A step that did call one has its text remembered
+  // here, and the transcript hides it. The checklist and Details already tell that story.
+  on('turn.step', async function* ($, e, next) {
+    const response = yield* next(e)
+    const text = response.answer.trim()
+    if (e.agentId === undefined && text !== '' && response.toolUses.length > 0) {
+      await update($, narrationAtom, list => [...list.slice(-199), text])
+    }
+    return response
+  })
+
+  on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
+    if (await read($, showsToolRowsAtom)) return next(e)
+    const text = e.props.text.trim()
+    const isNarration = text !== '' && (await read($, narrationAtom)).some(n => n.includes(text))
+    if (!isNarration) return next(e)
     const { Box } = $.ui.resolve(e)
     return <Box />
   })

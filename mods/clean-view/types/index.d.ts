@@ -60,6 +60,8 @@ declare module 'claude-code' {
       isOn: boolean
       checklist: Checklist
       tick: number
+      /** What Claude wrote between tool calls this job; the transcript hides it while Clean View is on. */
+      narration: string[]
     }
   }
 }

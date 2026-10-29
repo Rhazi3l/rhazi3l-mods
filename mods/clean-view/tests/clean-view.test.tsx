@@ -382,6 +382,31 @@ describe('checklist', () => {
     expect(await shown({ origin: { kind: 'peer' }, from: { name: 'Explore' } })).toBe(true)
   })
 
+  test('text written between tool calls is hidden, the closing answer is not', async ($, on) => {
+    on('ui.render', { component: 'AssistantMessage' }, ($, e) => {
+      const { Text } = $.ui.resolve(e)
+      return <Text>engine row</Text>
+    })
+    on('turn.step', async function* (_$, e) {
+      const answer = e.index === 0 ? 'Now the fix for the wrapping.' : 'All sorted.'
+      return { turnId: e.turnId, index: e.index, answer, toolUses: e.index === 0 ? [{ id: 'u1', name: 'Bash', input: {} }] : [], stopReason: null } as never
+    })
+    await startJob($, on)
+    for await (const _chunk of $.turn.step({ turnId: 't1', index: 0, model: 'm', messageCount: 1 } as never)) void _chunk
+    for await (const _chunk of $.turn.step({ turnId: 't1', index: 1, model: 'm', messageCount: 3 } as never)) void _chunk
+    const shown = async (text: string) => {
+      const ui = await $.ui.mount({ plugin: 'clean-view', component: 'AssistantMessage', surface: 'terminal', props: { text, isFirstOfReply: true } } as never)
+      const found = (await ui.find({ type: 'Text', text: 'engine row' })) !== undefined
+      await ui.unmount()
+      return found
+    }
+
+    expect(await shown('Now the fix for the wrapping.')).toBe(false)
+    expect(await shown('All sorted.')).toBe(true)
+    await $.command.run({ command: 'view', args: 'off', ...RUN })
+    expect(await shown('Now the fix for the wrapping.')).toBe(true)
+  })
+
   test('the spinner line is cut to its word once a plan exists, on the terminal only', async ($, on) => {
     const SPINNER = { plugin: 'clean-view', component: 'Spinner', props: { word: 'Fermenting', message: null, suffix: '…', mode: 'responding' } } as const
     on('ui.render', { component: 'Spinner' }, ($, e) => {
