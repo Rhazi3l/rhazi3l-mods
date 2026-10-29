@@ -122,10 +122,19 @@ export async function drawBox(
   const waitsForReply = c.phase === 'needsYou' && c.question !== ''
   // What Claude is asking, and one-press answers where the question has clear options.
   // The question and its buttons share a row, the buttons at the right where the steps' bars sit, so the
-  // question takes one row less; a long question wraps in the room beside them.
+  // question takes one row less; a long question wraps in the room beside them. The desktop's buttons are taller
+  // than a line, so the row has room above, and below only while steps follow it (alone, the frame's edge is enough).
   const askRows = waitsForReply
     ? [
-        <Box key="clean-view-ask" flexDirection="row" flexWrap="wrap" alignItems="center" gap={1} paddingY={isTerminal ? undefined : 'md'}>
+        <Box
+          key="clean-view-ask"
+          flexDirection="row"
+          flexWrap="wrap"
+          alignItems="center"
+          gap={1}
+          paddingTop={isTerminal ? undefined : 'md'}
+          paddingBottom={isTerminal || c.tasks.length === 0 ? undefined : 'md'}
+        >
           <Box key="clean-view-question" flexGrow={1} flexShrink={1}>
             <Text wrap="wrap">{c.question}</Text>
           </Box>

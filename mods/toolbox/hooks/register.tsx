@@ -222,6 +222,7 @@ export const register: Register = on => {
           key="toolbox-panel"
           alignSelf="flex-end"
           flexDirection="column"
+          marginTop={isTerminal ? undefined : 'sm'}
           borderStyle="round"
           borderColor={PASTEL.working}
           paddingX={isTerminal ? 1 : 'md'}
