@@ -10,6 +10,7 @@ Rules:
 - Add only what the prompt leaves open and a good request needs: the goal, who it is for, the format, and what done looks like.
 - A prompt that is already specific stays nearly as it is.
 - Never invent facts, names, numbers, prices or file names. Where something is unknown, leave a [placeholder] in square brackets.
+- If the text is not a request (a test word, a greeting, a single word), return it unchanged with an empty list.
 - Write one request in plain language, as the person could have typed it themselves.
 - British English. No em dashes.
 Answer with JSON only, no other text: {"prompt": "the rewritten prompt", "added": ["short phrase", ...]}
@@ -47,6 +48,19 @@ export function parseUpgrade(reply: string): Upgrade | null {
 
 export function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length
+}
+
+/** Below this many words a prompt has nothing for the model to improve, so no call is made. */
+const MIN_WORDS = 4
+export const isTooShort = (text: string) => countWords(text) < MIN_WORDS
+
+/** `1 word`, `2 words`. */
+export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
+
+/** Whether the model found nothing to add: the same words, or no details listed and at most two words of difference. */
+export function isUnchanged(original: string, upgraded: string, added: readonly string[]): boolean {
+  const plain = (text: string) => text.toLowerCase().replace(/[\s.!?]+/g, ' ').trim()
+  return plain(original) === plain(upgraded) || (added.length === 0 && Math.abs(countWords(upgraded) - countWords(original)) <= 2)
 }
 
 /** The `[placeholders]` in a text, without the brackets, each once, in the order they first appear. A `[link](address)` is not one. */

@@ -3,7 +3,7 @@ import type { Engine, MockClock } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { PASTEL } from '../hooks/palette'
-import { buildRequest, countWords, fillPlaceholders, findPlaceholders, parseUpgrade } from '../hooks/text'
+import { buildRequest, countWords, fillPlaceholders, findPlaceholders, isTooShort, isUnchanged, parseUpgrade, plural } from '../hooks/text'
 
 const SURFACES = ['terminal', 'desktop'] as const
 const RUN = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
@@ -99,7 +99,48 @@ describe('placeholders', () => {
   })
 })
 
+describe('small words', () => {
+  test('plurals, short prompts and unchanged answers', async () => {
+    expect(plural(1, 'word')).toBe('1 word')
+    expect(plural(0, 'blank')).toBe('0 blanks')
+    expect(isTooShort('testing')).toBe(true)
+    expect(isTooShort('fix the login bug')).toBe(false)
+    expect(isUnchanged('Fix the bug.', 'fix the bug', ['x'])).toBe(true)
+    expect(isUnchanged('fix the bug', 'fix the bug in the login form', [])).toBe(false)
+    expect(isUnchanged('fix the bug', 'Fix the bug now', [])).toBe(true)
+    expect(isUnchanged('fix the bug', 'Fix the bug in the login form', ['Where'])).toBe(false)
+  })
+})
+
 describe('the /better flow', () => {
+  test('a prompt under four words is not sent to the model, from /better or the button', async ($, on) => {
+    const seen = await startSession($, on)
+    expect((await $.command.run({ command: 'better', args: 'testing', ...RUN })).text).toContain('Already short')
+    draft = 'hi there'
+    const footer = await $.ui.mount({ ...FOOTER, surface: 'desktop' })
+    await footer.press({ key: 'pu-upgrade' })
+    await footer.unmount()
+    expect(seen.modelCalls).toBe(0)
+    expect(seen.toasts).toEqual([expect.stringContaining('Already short')])
+  })
+
+  test('an answer with nothing added says so and offers to send the original', async ($, on) => {
+    const seen = await startSession($, on, () => ({ isAnswered: true, text: JSON.stringify({ prompt: ROUGH, added: [] }) }))
+    await better($, ROUGH)
+    for (const surface of SURFACES) {
+      const pane = await $.ui.mount({ ...PANE, surface })
+      expect(await pane.find({ type: 'Text', text: 'Already clear. Nothing to add.' })).toBeDefined()
+      expect(await pane.find({ key: 'pu-upgraded' })).toBeUndefined()
+      expect(await pane.find({ key: 'pu-edit' })).toBeUndefined()
+      expect(await pane.find({ key: 'pu-run' })).toMatchObject({ props: { label: 'Send as it is', variant: 'primary' } })
+      await pane.unmount()
+    }
+    const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    await pane.press({ key: 'pu-run' })
+    await pane.unmount()
+    expect(seen.submitted).toEqual([ROUGH])
+  })
+
   test('/better answers at once, then the pane shows the prompt beside the upgrade on both surfaces', async ($, on) => {
     const seen = await startSession($, on)
     const answered = await better($, ROUGH)

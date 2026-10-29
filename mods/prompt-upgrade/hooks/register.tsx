@@ -2,15 +2,15 @@
 // `/better <rough prompt>`) rewrites the prompt into a clearer one and shows both
 // in a pane. Nothing is sent until the person presses Run it.
 // Opt in per prompt, one fast-model call, no history kept.
-// Colours are theme keys and layout is boxes that wrap, so it follows the theme
-// and draws the same in the terminal and the desktop app.
+// Colours are the mods' shared palette (palette.ts) and layout is boxes that wrap, so it
+// draws the same in the terminal and the desktop app.
 
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { UpgradeFlow } from '../types'
 import { PASTEL } from './palette'
-import { buildRequest, countWords, fillPlaceholders, findPlaceholders, parseUpgrade } from './text'
+import { buildRequest, countWords, fillPlaceholders, findPlaceholders, isTooShort, isUnchanged, parseUpgrade, plural } from './text'
 
 const PANE = 'prompt-upgrade'
 const TITLE = 'Prompt Upgrade'
@@ -22,6 +22,8 @@ const IDLE: UpgradeFlow = { phase: 'idle', original: '', upgraded: '', added: []
 // Whether the footer button shows. The toolbox switches it; `/better <prompt>` works either way.
 const isOnAtom = atom({ plugin: 'prompt-upgrade', key: 'isOn' } as const, true)
 const flowAtom = atom({ plugin: 'prompt-upgrade', key: 'flow' } as const, IDLE)
+
+const TOO_SHORT = 'Already short, so there is nothing to upgrade. Send it as it is.'
 
 const USAGE =
   'Type your prompt, then press the ✦ Better button above it (or type /better and the prompt). A pane shows the upgrade beside it, and nothing is sent until you press Run it.'
@@ -136,6 +138,7 @@ export const register: Register = on => {
       return { text: `The Better button is ${turnsOn ? 'on' : 'off'}.` }
     }
     if (args === '') return { text: USAGE }
+    if (isTooShort(args)) return { text: TOO_SHORT }
     // A command answers at once; the pane and the model call follow in the background.
     $.clock.after(0, () => {
       void upgrade($, args)
@@ -160,6 +163,7 @@ export const register: Register = on => {
               try {
                 const draft = (await $.prompt.read()).text.trim()
                 if (draft === '') return $.ui.toast('Type a prompt first, then press Better.')
+                if (isTooShort(draft)) return $.ui.toast(TOO_SHORT)
                 void upgrade($, draft)
               } catch {
                 $.ui.toast("Couldn't read your prompt.")
@@ -252,14 +256,29 @@ export const register: Register = on => {
     const text = fillPlaceholders(flow.upgraded, flow.fills)
     const blanks = findPlaceholders(flow.upgraded)
     const filledCount = blanks.filter(name => (flow.fills[name] ?? '').trim() !== '').length
+    if (isUnchanged(flow.original, flow.upgraded, flow.added) && blanks.length === 0) {
+      return (
+        <Box flexDirection="column" gap={1}>
+          <Text key="pu-clear" bold color={PASTEL.done}>
+            Already clear. Nothing to add.
+          </Text>
+          <Box flexDirection="row" flexWrap="wrap" gap={1}>
+            <Button key="pu-run" label="Send as it is" variant="primary" hotkey="r" onPress={() => send($, flow.original)} />
+            {cancel}
+          </Box>
+          {card('pu-original', 'YOUR PROMPT', flow.original, PASTEL.stopped)}
+        </Box>
+      )
+    }
+
     const before = countWords(flow.original)
     const after = countWords(text)
-    const details = `${flow.added.length} detail${flow.added.length === 1 ? '' : 's'} added`
-    const left = blanks.length === 0 ? '' : ` · ${filledCount} of ${blanks.length} blank${blanks.length === 1 ? '' : 's'} filled`
+    const details = `${plural(flow.added.length, 'detail')} added`
+    const left = blanks.length === 0 ? '' : ` · ${filledCount} of ${plural(blanks.length, 'blank')} filled`
 
     return (
       <Box flexDirection="column" gap={1}>
-        <Text key="pu-numbers" dimColor>{`${before} words → ${after} words · ${details}${left}`}</Text>
+        <Text key="pu-numbers" dimColor>{`${plural(before, 'word')} → ${plural(after, 'word')} · ${details}${left}`}</Text>
         <Box flexDirection="row" flexWrap="wrap" gap={1}>
           <Button key="pu-run" label="Run it" variant="primary" hotkey="r" onPress={() => send($, text)} />
           <Button key="pu-edit" label="Edit in prompt box" hotkey="e" onPress={() => editInBox($, text)} />
