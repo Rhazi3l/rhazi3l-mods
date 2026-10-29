@@ -32,8 +32,8 @@ const PROGRESS_TOOL = 'mcp__clean-view__report_progress'
 
 const ALWAYS_ALLOWED = new Set(['ToolSearch', 'TodoWrite', 'TaskCreate', 'TaskUpdate', 'AskUserQuestion'])
 const METER = 10
-/** The overall bar's cells where the surface does not draw in even cells (the desktop app). */
-const OVERALL_FIXED = 20
+/** How many steps the checklist shows at once; the rest are summed up in one line. */
+export const MAX_VISIBLE_STEPS = 3
 /** Room for a step's label after its bar: two cells of gap, then `Working` or `Up next`. */
 const LABEL_CELLS = 9
 const TICK_MS = 250
@@ -250,16 +250,20 @@ function detailGroups(c: Checklist): { step: string; status: ChecklistTask['stat
 
 // ---------- Drawing helpers ----------
 
-/** How far the whole job is: done steps, plus the reported share of the one in progress. */
-function overallPercent(tasks: readonly ChecklistTask[]): number {
-  if (tasks.length === 0) return 0
-  const done = tasks.filter(t => t.status === 'done').length
-  const active = tasks.find(t => t.status === 'active')
-  const partial = active?.hasReported ? active.percent / 100 : 0
-  return Math.round(((done + partial) / tasks.length) * 100)
+/**
+ * Which steps of a long list to draw: the one in progress first, then what comes next, so finished steps
+ * drop out of sight. Near the end it pulls back to keep `max` rows (finished steps fill the gap).
+ */
+export function stepWindow(tasks: readonly ChecklistTask[], max = MAX_VISIBLE_STEPS): { start: number; end: number } {
+  if (tasks.length <= max) return { start: 0, end: tasks.length }
+  let focus = tasks.findIndex(t => t.status === 'active')
+  if (focus < 0) focus = tasks.findIndex(t => t.status === 'upcoming')
+  if (focus < 0) focus = tasks.length - 1
+  const start = Math.max(0, Math.min(focus, tasks.length - max))
+  return { start, end: start + max }
 }
 
-/** A step's bar as lit and unlit cells (`━`, as the overall bar): full, empty, a share, or a moving run while no share is known. */
+/** A step's bar as lit and unlit cells (`━`): full, empty, a share, or a moving run while no share is known. */
 export function meterCells(task: ChecklistTask, tick: number): boolean[] {
   if (task.status === 'done') return Array.from({ length: METER }, () => true)
   if (task.status === 'upcoming') return Array.from({ length: METER }, () => false)
@@ -280,6 +284,34 @@ function meterRuns(cells: boolean[]): { lit: boolean; text: string }[] {
     else runs.push({ lit, text: '━' })
   }
   return runs
+}
+
+/** Drawn bars: each cell is this many pixels wide, and the bar this thick, centred in a box this tall. */
+const BAR_CELL_PX = 8
+const BAR_THICK_PX = 3
+const BAR_BOX_PX = 16
+/** The unlit track: a neutral grey that reads on the desktop's light and dark themes alike. */
+const BAR_TRACK = '#787d87'
+
+/**
+ * A bar as an SVG: an unlit track with a run of lit cells on top for each run in `cells`. The desktop app
+ * draws text in a proportional font, so a `━` character sits at another height than the label beside it;
+ * a drawing centred in its row does not.
+ */
+export function barSvg(cells: boolean[], litColor: string): string {
+  const width = cells.length * BAR_CELL_PX
+  const y = (BAR_BOX_PX - BAR_THICK_PX) / 2
+  const rect = (x: number, w: number, fill: string, opacity: number) =>
+    `<rect x="${x}" y="${y}" width="${w}" height="${BAR_THICK_PX}" rx="1.5" fill="${fill}" opacity="${opacity}"/>`
+  const lit: string[] = []
+  for (let i = 0; i < cells.length; i++) {
+    if (!cells[i]) continue
+    let end = i
+    while (end + 1 < cells.length && cells[end + 1]) end++
+    lit.push(rect(i * BAR_CELL_PX, (end - i + 1) * BAR_CELL_PX, litColor, 1))
+    i = end
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${BAR_BOX_PX}" viewBox="0 0 ${width} ${BAR_BOX_PX}">${rect(0, width, BAR_TRACK, 0.35)}${lit.join('')}</svg>`
 }
 
 // ---------- Hooks ----------
@@ -595,7 +627,8 @@ export const register: Register = on => {
     if (mode === 'full' || c.phase === 'idle' || c.startedAt === null) return next(e)
     const below = await next(e)
 
-    const { Box, Text, Button } = $.ui.resolve(e)
+    const ui = $.ui.resolve(e)
+    const { Box, Text, Button } = ui
     const tick = await read($, tickAtom)
     const now = await $.clock.now()
     const style = await read($, styleAtom)
@@ -606,6 +639,8 @@ export const register: Register = on => {
     // buttons, wider than the cells it reports, so there the boxes do the
     // aligning, bars keep a fixed size and the buttons wrap.
     const isTerminal = e.surface === 'terminal'
+    // Where the surface can draw an image, bars are drawn as one, centred in their row (see barSvg).
+    const Svg = !isTerminal && 'Svg' in ui ? ui.Svg : undefined
 
     const buttons = (
       <Box key="clean-view-buttons" flexDirection="row" flexShrink={0}>
@@ -720,21 +755,7 @@ export const register: Register = on => {
       )
     }
 
-    const total = c.tasks.length
-    const doneCount = c.tasks.filter(t => t.status === 'done').length
-    const overall = overallPercent(c.tasks)
-    const stepText = `Step ${Math.max(1, Math.min(total, doneCount + 1))} of ${total}`
-    const overallCells = isTerminal ? Math.max(4, width - stepText.length - 7) : OVERALL_FIXED
-    const overallFilled = Math.round((overall / 100) * overallCells)
-    const overallRow =
-      total > 0 && c.phase !== 'done' ? (
-        <Box key="clean-view-overall" flexDirection="row">
-          <Text dimColor>{`${stepText} `}</Text>
-          <Text color={PASTEL.working}>{'━'.repeat(overallFilled)}</Text>
-          <Text color="subtle">{'━'.repeat(overallCells - overallFilled)}</Text>
-          <Text bold color={PASTEL.working}>{` ${String(overall).padStart(3)}%`}</Text>
-        </Box>
-      ) : null
+    const { start: windowStart, end: windowEnd } = stepWindow(c.tasks)
 
     const nameWidth = Math.max(8, Math.min(MAX_NAME, width - 24))
     const firstUpcoming = c.tasks.findIndex(t => t.status === 'upcoming')
@@ -742,6 +763,7 @@ export const register: Register = on => {
     const showsTrail = mode === 'guided' && latest !== undefined && c.phase !== 'done'
 
     const rows = c.tasks.flatMap((task, i) => {
+      if (i < windowStart || i >= windowEnd) return []
       const isActive = task.status === 'active'
       const icon = task.status === 'done' ? '✓' : isActive ? (c.phase === 'needsYou' ? '‖' : '▶') : '○'
       const label =
@@ -755,7 +777,7 @@ export const register: Register = on => {
               ? 'Next'
               : 'Up next'
       const row = (
-        <Box key={`task-${task.id}`} flexDirection="row">
+        <Box key={`task-${task.id}`} flexDirection="row" alignItems="center">
           <Text color={task.status === 'done' ? PASTEL.done : isActive ? PASTEL.working : undefined} dimColor={task.status === 'upcoming'}>
             {`${icon} `}
           </Text>
@@ -765,11 +787,21 @@ export const register: Register = on => {
             </Text>
           </Box>
           <Box key="meter" flexDirection="row" flexShrink={0}>
-            {meterRuns(meterCells(task, tick)).map((run, r) => (
-              <Text key={`meter-${task.id}-${r}`} color={!run.lit ? 'subtle' : task.status === 'done' ? PASTEL.done : PASTEL.working}>
-                {run.text}
-              </Text>
-            ))}
+            {Svg ? (
+              <Svg
+                key={`meter-${task.id}`}
+                source={barSvg(meterCells(task, tick), task.status === 'done' ? PASTEL.done : PASTEL.working)}
+                alt={label}
+                width={METER * BAR_CELL_PX}
+                height={BAR_BOX_PX}
+              />
+            ) : (
+              meterRuns(meterCells(task, tick)).map((run, r) => (
+                <Text key={`meter-${task.id}-${r}`} color={!run.lit ? 'subtle' : task.status === 'done' ? PASTEL.done : PASTEL.working}>
+                  {run.text}
+                </Text>
+              ))
+            )}
           </Box>
           <Box key="label" width={LABEL_CELLS} flexShrink={0} paddingLeft={2}>
             <Text dimColor={!isActive}>{label}</Text>
@@ -788,9 +820,21 @@ export const register: Register = on => {
       ]
     })
 
+    // What the window leaves out, in one line: finished steps above it, steps still to come below it.
+    const hiddenDone = windowStart
+    const hiddenToCome = c.tasks.length - windowEnd
+    const hiddenText = [hiddenDone > 0 ? `✓ ${hiddenDone} done` : '', hiddenToCome > 0 ? `${hiddenToCome} more to come` : '']
+      .filter(part => part !== '')
+      .join(' · ')
+    const moreRow = hiddenText === '' ? null : (
+      <Box key="clean-view-more" flexDirection="row" paddingLeft={2}>
+        <Text dimColor>{hiddenText}</Text>
+      </Box>
+    )
+
     return (
       <Box flexDirection="column">
-        {frame([headerRow, ...askRows, overallRow, ...rows])}
+        {frame([headerRow, ...askRows, ...rows, moreRow])}
         {below}
       </Box>
     )

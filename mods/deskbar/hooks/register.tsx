@@ -229,7 +229,8 @@ export const register: Register = on => {
     return (
       <Box flexDirection="column">
         {below}
-        <Box key="deskbar" flexDirection="row" flexWrap="wrap">
+        {/* Room above and below, and the checklist frame's left inset, so the band doesn't crowd the frame or the prompt box. */}
+        <Box key="deskbar" flexDirection="row" flexWrap="wrap" paddingX="sm" marginTop="xs" marginBottom="xs">
           {plan !== null &&
             part('plan', [
               <Text key="dot" color={PASTEL.done}>{'◆ '}</Text>,

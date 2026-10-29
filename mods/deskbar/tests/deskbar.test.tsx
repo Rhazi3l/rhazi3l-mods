@@ -116,7 +116,7 @@ describe('deskbar', () => {
     await terminal.unmount()
 
     const band = await $.ui.mount({ ...BAND, surface: 'desktop' })
-    expect(await band.find({ key: 'deskbar' })).toMatchObject({ props: { flexWrap: 'wrap' } })
+    expect(await band.find({ key: 'deskbar' })).toMatchObject({ props: { flexWrap: 'wrap', paddingX: 'sm', marginTop: 'xs', marginBottom: 'xs' } })
     expect(await band.find({ type: 'Text', text: 'Pro' })).toBeDefined()
     // The desktop app shows the model and effort itself, so the band leaves them out.
     expect(await band.find({ type: 'Text', text: 'Sonnet 5.5' })).toBeUndefined()

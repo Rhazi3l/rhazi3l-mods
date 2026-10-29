@@ -3,7 +3,7 @@ import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { PASTEL } from '../hooks/palette'
-import { asksSomething, meterCells } from '../hooks/register'
+import { asksSomething, barSvg, meterCells, stepWindow } from '../hooks/register'
 import { cleanName, describeAction, extractQuestion, quickReplies } from '../hooks/text'
 
 const PREFIX = 'mcp__clean-view__'
@@ -148,9 +148,18 @@ describe('checklist', () => {
       expect(await ui.find({ type: 'Text', text: /▶/ })).toBeDefined()
       expect(await ui.find({ key: 'clean-view-style' })).toBeDefined()
       expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.working } })
-      expect(await ui.find({ key: 'clean-view-overall' })).toMatchObject({ text: expect.stringMatching(/Step 2 of 4 ━+ +40%/) })
-      expect(await ui.find({ type: 'Text', text: /^━{6}$/ })).toMatchObject({ props: { color: PASTEL.working } })
-      expect(await ui.find({ type: 'Text', text: /^━{4}$/ })).toMatchObject({ props: { color: 'subtle' } })
+      // No overall Step x of y bar: the steps are the progress.
+      expect(await ui.find({ key: 'clean-view-overall' })).toBeUndefined()
+      expect(await ui.find({ type: 'Text', text: /Step \d/ })).toBeUndefined()
+      if (surface === 'terminal') {
+        expect(await ui.find({ type: 'Text', text: /^━{6}$/ })).toMatchObject({ props: { color: PASTEL.working } })
+        expect(await ui.find({ type: 'Text', text: /^━{4}$/ })).toMatchObject({ props: { color: 'subtle' } })
+      } else {
+        // The desktop draws each step's bar as an image, centred in its row, in the same colours.
+        expect(await ui.find({ type: 'Text', text: /^━/ })).toBeUndefined()
+        expect(await ui.find({ type: 'Svg' })).toMatchObject({ props: { alt: '60%' } })
+        expect(JSON.stringify(await ui.find({ type: 'Svg' }))).toContain(PASTEL.working)
+      }
       await ui.unmount()
     }
   })
@@ -475,17 +484,71 @@ describe('layout on each surface', () => {
     const term = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await term.find({ key: 'clean-view-header' })).toMatchObject({ props: { flexWrap: 'nowrap' } })
     expect(await term.find({ key: 'name' })).toMatchObject({ props: { width: expect.any(Number) } })
-    const termBar = await term.find({ key: 'clean-view-overall' })
-    expect((termBar?.text.match(/━/g) ?? []).length).toBeGreaterThan(40)
     await term.unmount()
 
     const desk = await $.ui.mount({ ...BAND, surface: 'desktop' })
     expect(await desk.find({ key: 'clean-view-header' })).toMatchObject({ props: { flexWrap: 'wrap' } })
     expect(await desk.find({ key: 'clean-view-buttons' })).toMatchObject({ props: { flexShrink: 0 } })
     expect(await desk.find({ key: 'name' })).toMatchObject({ props: { flexGrow: 1, flexShrink: 1 } })
-    const deskBar = await desk.find({ key: 'clean-view-overall' })
-    expect((deskBar?.text.match(/━/g) ?? []).length).toBe(20)
+    expect(await desk.find({ type: 'Svg' })).toMatchObject({ props: { width: 80, height: 16 } })
+    expect(await desk.find({ type: 'Text', text: /^━/ })).toBeUndefined()
     expect(await desk.find({ type: 'Text', text: /^Read your notes +$/ })).toBeUndefined()
     await desk.unmount()
+  })
+})
+
+describe('drawn bars', () => {
+  test('barSvg draws a track with one lit run for each run of lit cells, centred in its box', async () => {
+    const svg = barSvg([true, true, false, false, true], '#d4743c')
+    expect(svg).toContain('width="40" height="16"')
+    expect((svg.match(/<rect/g) ?? []).length).toBe(3)
+    expect(svg).toContain('x="0" y="6.5" width="16"')
+    expect(svg).toContain('x="32" y="6.5" width="8"')
+    expect(svg).toContain('opacity="0.35"')
+    expect((barSvg([false, false], '#9dcb86').match(/<rect/g) ?? []).length).toBe(1)
+  })
+})
+
+const named = (n: number, doneCount = 0) =>
+  Array.from({ length: n }, (_, i) => ({ id: `t${i}`, name: `Step ${i + 1}`, status: i < doneCount ? 'done' : i === doneCount ? 'active' : 'upcoming' })) as never
+
+describe('the three-step window', () => {
+  test('stepWindow shows the step in progress first, pulling back at the end', async () => {
+    expect(stepWindow(named(3, 1))).toEqual({ start: 0, end: 3 })
+    expect(stepWindow(named(6, 0))).toEqual({ start: 0, end: 3 })
+    expect(stepWindow(named(6, 2))).toEqual({ start: 2, end: 5 })
+    expect(stepWindow(named(6, 5))).toEqual({ start: 3, end: 6 })
+    // Every step done: the last three.
+    expect(stepWindow(named(6, 6))).toEqual({ start: 3, end: 6 })
+    expect(stepWindow(named(6, 2), 4)).toEqual({ start: 2, end: 6 })
+  })
+
+  test('a long list draws three rows and one line for the rest', async ($, on) => {
+    await startJob($, on)
+    await $.tool.call({ tool: PLAN, steps: ['One', 'Two', 'Three', 'Four', 'Five', 'Six'] } as never)
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect(await ui.find({ type: 'Text', text: /One/ })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /Three/ })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /Four/ })).toBeUndefined()
+      expect(await ui.find({ type: 'Text', text: '3 more to come' })).toBeDefined()
+      await ui.unmount()
+    }
+    for (const step of ['One', 'Two']) await $.tool.call({ tool: PROGRESS, task: step, percent: 100 } as never)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await ui.find({ type: 'Text', text: /One|Two/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /Three/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Five/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Six/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: '✓ 2 done · 1 more to come' })).toBeDefined()
+    await ui.unmount()
+  })
+
+  test('a short list has no summary line', async ($, on) => {
+    await startJob($, on)
+    await $.tool.call({ tool: PLAN, steps: ['One', 'Two', 'Three'] } as never)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await ui.find({ key: 'clean-view-more' })).toBeUndefined()
+    await ui.unmount()
   })
 })

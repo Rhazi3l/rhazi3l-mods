@@ -1,6 +1,6 @@
 {
   "name": "clean-view",
-  "version": "1.4.7",
+  "version": "1.5.0",
   "description": "A plain-English checklist of Claude's plan and progress above the prompt, in place of the technical tool rows. Details shows every step and action.",
   "author": {
     "name": "Rhazi3l"
