@@ -309,15 +309,18 @@ export const register: Register = on => {
           <Box key="pu-blanks" flexDirection="column">
             <Text dimColor>FILL IN THE BLANKS</Text>
             {blanks.map((name, i) => (
-              <Input
-                key={`pu-fill-${i}`}
-                label={`${name}: `}
-                placeholder="type what goes here"
-                value={flow.fills[name] ?? ''}
-                submitLabel="next"
-                onInput={value => void update($, flowAtom, now => ({ ...now, fills: { ...now.fills, [name]: value } }))}
-                onSubmit={() => undefined}
-              />
+              // The model's description of a blank can run long, so it wraps above its field instead of beside it.
+              <Box key={`pu-blank-${i}`} flexDirection="column" marginTop={1}>
+                <Text dimColor wrap="wrap">{name}</Text>
+                <Input
+                  key={`pu-fill-${i}`}
+                  placeholder="type what goes here"
+                  value={flow.fills[name] ?? ''}
+                  submitLabel="next"
+                  onInput={value => void update($, flowAtom, now => ({ ...now, fills: { ...now.fills, [name]: value } }))}
+                  onSubmit={() => undefined}
+                />
+              </Box>
             ))}
           </Box>
         )}
