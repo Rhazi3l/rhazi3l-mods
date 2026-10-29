@@ -80,7 +80,7 @@ const showsToolRowsAtom = derive([modeAtom], mode => mode === 'full')
 
 const PROMPT_SECTION = `# Clean View
 The person sees your to-do list as a plain-English checklist; tool output is hidden.
-- For work of two or more steps, start with a TodoWrite or TaskCreate list and keep it current, marking each step completed as soon as it is done. Skip the list for a quick question.
+- For work of two or more steps, start with a to-do list (TodoWrite, TaskCreate, or the app's own plan tool, update_plan) and keep it current, marking each step completed as soon as it is done. Skip the list for a quick question.
 - Write every step name in plain English, under 40 characters, starting with a verb, like "Build the pricing section". No file paths, file names, commands, code or tool names.
 - Answer first, in as few words as possible. Do not narrate steps or repeat results the person can open in Details. End with a short plain-English summary of what changed and anything they must decide.`
 
@@ -107,6 +107,41 @@ function startFirstUpcoming(tasks: ChecklistTask[]): ChecklistTask[] {
 const titleFor = (c: Checklist, tasks: readonly ChecklistTask[]) => (c.title === DEFAULT_TITLE && tasks[0] ? tasks[0].name : c.title)
 
 type Todo = { content: string; status: 'pending' | 'in_progress' | 'completed' }
+
+const PLAN_TOOL = 'mcp__ccd_turn__update_plan'
+
+/**
+ * A plan tool's step updates on the current list: `advance` finishes the step in progress and
+ * starts the next waiting one, `done` finishes steps by their 1-based number, `start` begins one.
+ */
+export function applyPlanStep(c: Checklist, args: { advance?: unknown; done?: unknown; start?: unknown }): Checklist {
+  const pick = (n: unknown) => (typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= c.tasks.length ? n - 1 : -1)
+  const finished = new Set<number>(
+    Array.isArray(args.done) ? args.done.map(pick).filter(i => i >= 0) : [],
+  )
+  if (args.advance === true) {
+    const active = c.tasks.findIndex(t => t.status === 'active')
+    if (active >= 0) finished.add(active)
+  }
+  const begun = pick(args.start)
+  let tasks = c.tasks.map((t, i): ChecklistTask => {
+    if (finished.has(i)) return { ...t, status: 'done', percent: 100 }
+    if (i === begun) return { ...t, status: 'active', percent: 0, hasReported: false }
+    return t
+  })
+  if (finished.size > 0) tasks = startFirstUpcoming(tasks)
+  return { ...c, tasks }
+}
+
+/** The `{content, status}` entries of a full list a plan tool sends, leaving out anything malformed. */
+export function plannedTodos(items: unknown): Todo[] {
+  if (!Array.isArray(items)) return []
+  return items.flatMap((item): Todo[] => {
+    const { content, status } = (item ?? {}) as { content?: unknown; status?: unknown }
+    if (typeof content !== 'string' || (status !== 'pending' && status !== 'in_progress' && status !== 'completed')) return []
+    return [{ content, status }]
+  })
+}
 
 function applyTodos(c: Checklist, todos: readonly Todo[]): Checklist {
   const tasks = todos.map<ChecklistTask>((todo, i) => {
@@ -412,6 +447,11 @@ export const register: Register = on => {
 
       if (!isFailed) {
         if (e.tool === 'TodoWrite') changed = applyTodos(changed, e.todos)
+        if (e.tool === PLAN_TOOL) {
+          const args = e as { items?: unknown; advance?: unknown; done?: unknown; start?: unknown }
+          const todos = plannedTodos(args.items)
+          changed = todos.length > 0 ? applyTodos(changed, todos) : applyPlanStep(changed, args)
+        }
         if (e.tool === 'TaskCreate' && ran.result) {
           const created = (ran.result as { task?: { id?: string } }).task
           const base = changed.hasRealPlan ? changed.tasks : []

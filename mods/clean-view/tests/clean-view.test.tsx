@@ -3,7 +3,7 @@ import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { PASTEL } from '../hooks/palette'
-import { asksSomething, barSvg, meterCells, stepWindow } from '../hooks/register'
+import { asksSomething, barSvg, meterCells, plannedTodos, stepWindow } from '../hooks/register'
 import { cleanName, describeAction, extractQuestion, quickReplies } from '../hooks/text'
 
 const PREFIX = 'mcp__clean-view__'
@@ -197,6 +197,64 @@ describe('checklist', () => {
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await ui.find({ type: 'Text', text: '✓ All done · 2 steps' })).toBeDefined()
     await ui.unmount()
+  })
+
+  test("the desktop app's plan tool fills the checklist and gets no line of its own", async ($, on) => {
+    on('tool.call', { tool: 'mcp__ccd_turn__update_plan' }, () => ({ result: 'ok' }) as never)
+    await startJob($, on)
+    await $.tool.call({
+      tool: 'mcp__ccd_turn__update_plan',
+      items: [
+        { content: 'Read your notes', status: 'completed' },
+        { content: 'Write the page', status: 'in_progress' },
+        { content: 'Check the links', status: 'pending' },
+        { status: 'pending' },
+      ],
+    } as never)
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect(await ui.find({ type: 'Text', text: '✱ Working on your request' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: 'Write the page' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: 'Check the links' })).toBeDefined()
+      expect(await ui.find({ key: 'clean-view-trail' })).toBeUndefined()
+      await ui.unmount()
+    }
+    expect(plannedTodos('nope')).toEqual([])
+    expect(plannedTodos([{ content: 'A', status: 'done' }])).toEqual([])
+  })
+
+  test("the plan tool's advance, done and start move the steps along", async ($, on) => {
+    on('tool.call', { tool: 'mcp__ccd_turn__update_plan' }, () => ({ result: 'ok' }) as never)
+    const plan = (args: object) => $.tool.call({ tool: 'mcp__ccd_turn__update_plan', ...args } as never)
+    const doneRows = async () => {
+      const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+      const n = (await ui.findAll({ type: 'Text', text: /^Done$/ })).length
+      await ui.unmount()
+      return n
+    }
+    await startJob($, on)
+    await plan({
+      items: ['One', 'Two', 'Three'].map((content, i) => ({ content, status: i === 0 ? 'in_progress' : 'pending' })),
+      scope: 'first_task',
+    })
+    expect(await doneRows()).toBe(0)
+
+    await plan({ advance: true })
+    expect(await doneRows()).toBe(1)
+    const second = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await second.find({ type: 'Text', text: 'Two' })).toMatchObject({ props: { bold: true } })
+    await second.unmount()
+
+    await plan({ done: [2], start: 3 })
+    expect(await doneRows()).toBe(2)
+    const third = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await third.find({ type: 'Text', text: 'Three' })).toMatchObject({ props: { bold: true } })
+    await third.unmount()
+
+    await plan({ advance: true })
+    expect(await doneRows()).toBe(3)
+    await plan({ advance: true, done: [99, 0, 'x'] })
+    expect(await doneRows()).toBe(3)
   })
 
   test('a to-do list draws done, Working, Next and Up next', async ($, on) => {

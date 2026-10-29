@@ -90,6 +90,9 @@ const CHECKLIST_TOOLS = new Set([
   'TaskUpdate',
   'TaskList',
   'TaskGet',
+  // The desktop app's own plan tools stand in for the to-do list.
+  'mcp__ccd_turn__update_plan',
+  'mcp__ccd_turn__wrap_up',
 ])
 
 function basename(path: unknown): string {
