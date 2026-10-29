@@ -75,8 +75,8 @@ const tickAtom = atom({ plugin: 'clean-view', key: 'tick' } as const, 0)
 /** The view in force: guided, or `full` while Clean View is off. */
 const modeAtom = derive([isOnAtom], (isOn): ViewMode => (isOn ? 'guided' : 'full'))
 
-/** Whether the transcript shows the engine's own tool rows: while Clean View is off, or until a plan gives the checklist something to say. */
-const showsToolRowsAtom = derive([modeAtom, checklistAtom], (mode, c) => mode === 'full' || !c.hasRealPlan)
+/** Whether the transcript shows the engine's own tool rows: only while Clean View is off. */
+const showsToolRowsAtom = derive([modeAtom], mode => mode === 'full')
 
 const PROMPT_SECTION = `# Clean View
 The person sees your to-do list as a plain-English checklist; tool output is hidden.
@@ -511,8 +511,6 @@ export const register: Register = on => {
     const mode = await read($, modeAtom)
     const c = await read($, checklistAtom)
     if (mode === 'full' || c.phase === 'idle' || c.startedAt === null) return next(e)
-    // No plan, nothing to list: the box waits for a to-do list, except when Claude needs you or is stuck.
-    if (!c.hasRealPlan && c.phase !== 'needsYou' && c.phase !== 'stuck' && c.phase !== 'stopped') return next(e)
     const below = await next(e)
 
     const ui = $.ui.resolve(e)
@@ -542,7 +540,7 @@ export const register: Register = on => {
     const elapsed = formatDuration((c.finishedAt ?? now) - c.startedAt)
     let header = (
       <Text bold color={PASTEL.working} wrap="truncate-end">
-        {`✱ ${DEFAULT_TITLE}`}
+        {c.tasks.length === 0 ? '✱ Working…' : `✱ ${DEFAULT_TITLE}`}
       </Text>
     )
     if (c.phase === 'needsYou') {
@@ -566,7 +564,7 @@ export const register: Register = on => {
     } else if (c.phase === 'done') {
       header = (
         <Text color={PASTEL.done} wrap="truncate-end">
-          {`✓ All done · ${c.tasks.length} step${c.tasks.length === 1 ? '' : 's'}`}
+          {`✓ All done${c.tasks.length === 0 ? '' : ` · ${c.tasks.length} step${c.tasks.length === 1 ? '' : 's'}`}`}
         </Text>
       )
     }

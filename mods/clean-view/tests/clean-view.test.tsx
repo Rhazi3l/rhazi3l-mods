@@ -135,21 +135,31 @@ describe('checklist', () => {
   })
 
 
-  test('the box stays hidden until a to-do list arrives, then appears', async ($, on) => {
+  test('before a plan the box is one Working line, and a to-do list fills it in', async ($, on) => {
     await startJob($, on)
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
-      expect(await ui.find({ key: 'clean-view-frame' })).toBeUndefined()
-      expect(await ui.find({ type: 'Text', text: /Working/ })).toBeUndefined()
+      expect(await ui.find({ key: 'clean-view-frame' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: '✱ Working…' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /Up next|Understand|Plan the steps/ })).toBeUndefined()
       await ui.unmount()
     }
     await todo($, ['Read your notes', 'Write the page'])
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
-      expect(await ui.find({ key: 'clean-view-frame' })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: '✱ Working on your request' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: '✱ Working…' })).toBeUndefined()
       await ui.unmount()
     }
+  })
+
+  test('a job with no to-do list ends green with a plain All done', async ($, on) => {
+    await startJob($, on)
+    await $.turn.complete({ turnId: 't1', answer: 'Done.', reason: 'answer' } as never)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await ui.find({ type: 'Text', text: '✓ All done' })).toBeDefined()
+    expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: PASTEL.done } })
+    await ui.unmount()
   })
 
   test('a question or a stuck job shows the box even with no to-do list', async ($, on) => {
@@ -246,12 +256,7 @@ describe('checklist', () => {
       return <Text>engine row</Text>
     })
     await startJob($, on)
-    // With no to-do list the checklist has nothing to say, so the engine's rows stay as they are.
-    const before = await $.ui.mount({ ...ROW, surface: 'terminal' })
-    expect(await before.find({ type: 'Text', text: 'engine row' })).toBeDefined()
-    await before.unmount()
-
-    await todo($, ['Read your notes', 'Write the page'])
+    // Hidden with or without a to-do list: a short prompt stays as plain as a long one.
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...ROW, surface })
       expect(await ui.find({ type: 'Text' })).toBeUndefined()
@@ -407,7 +412,7 @@ describe('replying to a question', () => {
     const next = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await next.find({ type: 'Text', text: /Needs you/ })).toBeUndefined()
     expect(await next.find({ key: 'clean-view-question' })).toBeUndefined()
-    expect(await next.find({ key: 'clean-view-frame' })).toBeUndefined()
+    expect(await next.find({ type: 'Text', text: '✱ Working…' })).toBeDefined()
     await next.unmount()
   })
 
