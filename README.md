@@ -41,11 +41,17 @@ then `/reload-plugins` in any open session.
 
 The Info panel shows no usage figures, so they don't sit in two places. Claude Code's own status line is the place for them, and for the prompt cache: the `statusLine` setting in `~/.claude/settings.json` runs a script of yours and draws its first line under the prompt. It is a Claude Code setting, not a mod, so it isn't in this repository. For example, with a script that prints the model, effort, context and rate limits (the five-hour and seven-day percentages are the nearest measure of what your plan counts):
 
-```json
-"statusLine": { "type": "command", "command": "~/.claude/statusline.sh", "padding": 0 }
+My script is in `statusline/statusline.sh`: plan, model, effort, context bar, prompt cache, and the 5h and weekly figures with their reset times, in the mods' colours. It needs `jq`, and runs on Linux and macOS (it avoids bash 4 and GNU `date`). On a new computer, copy it and add the setting (`refreshInterval` re-runs it every 60 seconds so a quiet chat turns cold on screen):
+
+```
+cp statusline/statusline.sh ~/.claude/statusline.sh && chmod +x ~/.claude/statusline.sh
 ```
 
-`/statusline` in a terminal session can write a script for you. The palette (see Colours below) keeps it looking the same as the mods.
+```json
+"statusLine": { "type": "command", "command": "~/.claude/statusline.sh", "padding": 0, "refreshInterval": 60 }
+```
+
+The copy in this repository is the one to edit; copy it over `~/.claude/statusline.sh` afterwards. `/statusline` in a terminal session can write a script for you. The palette (see Colours below) keeps it looking the same as the mods.
 
 ## Cache and advisor notes
 
