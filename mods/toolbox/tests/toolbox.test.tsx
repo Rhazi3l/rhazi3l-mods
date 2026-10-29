@@ -130,8 +130,10 @@ describe('toolbox', () => {
 
       await footer.press({ key: 'toolbox' })
       expect(await band.find({ key: 'toolbox-panel' })).toBeDefined()
-      expect(await band.find({ key: 'model-opus' })).toBeDefined()
-      expect(await band.find({ key: 'effort-high' })).toBeDefined()
+      // The terminal has the Model and Effort rows; the desktop app has its own pickers.
+      expect(await band.find({ key: 'model-opus' })).toEqual(surface === 'terminal' ? expect.anything() : undefined)
+      expect(await band.find({ key: 'effort-high' })).toEqual(surface === 'terminal' ? expect.anything() : undefined)
+      expect(await band.find({ key: 'advisor-opus' })).toBeDefined()
 
       expect(await band.find({ key: 'toolbox-close' })).toMatchObject({ props: { hotkey: 'x' } })
       await band.press({ key: 'toolbox-close' })
@@ -146,11 +148,11 @@ describe('toolbox', () => {
     await $.command.run({ command: 'toolbox', args: '', ...RUN })
     for (const surface of SURFACES) {
       const band = await $.ui.mount({ ...BAND, surface })
-      const model = await band.find({ key: 'toolbox-model' })
-      expect(model).toBeDefined()
-      expect(JSON.stringify(model)).toContain('"width":8')
-      expect(JSON.stringify(model)).toContain('"flexWrap":"wrap"')
-      expect(await band.find({ type: 'Text', text: /^Model {2,}/ })).toBeUndefined()
+      const row = await band.find({ key: surface === 'terminal' ? 'toolbox-model' : 'toolbox-advisor' })
+      expect(row).toBeDefined()
+      expect(JSON.stringify(row)).toContain('"width":8')
+      expect(JSON.stringify(row)).toContain('"flexWrap":"wrap"')
+      expect(await band.find({ type: 'Text', text: /^(Model|Advisor) {2,}/ })).toBeUndefined()
       await band.unmount()
     }
   })
@@ -160,11 +162,26 @@ describe('toolbox', () => {
     await $.command.run({ command: 'toolbox', args: '', ...RUN })
     const desktop = await $.ui.mount({ ...BAND, surface: 'desktop' })
     expect(await desktop.find({ key: 'toolbox-panel' })).toMatchObject({ props: { gap: 'sm' } })
-    expect(JSON.stringify(await desktop.find({ key: 'toolbox-model' }))).toContain('"columnGap":"sm"')
+    expect(JSON.stringify(await desktop.find({ key: 'toolbox-advisor' }))).toContain('"columnGap":"sm"')
     await desktop.unmount()
     const terminal = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(JSON.stringify(await terminal.find({ key: 'toolbox-panel' }))).not.toContain('"gap"')
     expect(JSON.stringify(await terminal.find({ key: 'toolbox-model' }))).not.toContain('Gap')
+    await terminal.unmount()
+  })
+
+  test('the desktop panel has no Model or Effort rows; the terminal panel has both', async ($, on) => {
+    await startSession($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
+    const desktop = await $.ui.mount({ ...BAND, surface: 'desktop' })
+    expect(await desktop.find({ key: 'toolbox-model' })).toBeUndefined()
+    expect(await desktop.find({ key: 'toolbox-effort' })).toBeUndefined()
+    expect(await desktop.find({ type: 'Text', text: /^(Model|Effort)$/ })).toBeUndefined()
+    expect(await desktop.find({ key: 'toolbox-advisor' })).toBeDefined()
+    await desktop.unmount()
+    const terminal = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await terminal.find({ key: 'toolbox-model' })).toBeDefined()
+    expect(await terminal.find({ key: 'toolbox-effort' })).toBeDefined()
     await terminal.unmount()
   })
 

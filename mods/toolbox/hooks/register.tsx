@@ -224,6 +224,8 @@ export const register: Register = on => {
     // The desktop app draws its buttons with a hairline between them and its rows touching, so there
     // each gets room; the terminal draws what is written, brackets and all.
     const isTerminal = e.surface === 'terminal'
+    // The desktop app has its own model and effort pickers, so the panel leaves those two rows to it.
+    const showsModelAndEffort = e.surface !== 'desktop'
     const buttons = (children: RenderChildren) => (
       <Box flexDirection="row" flexWrap="wrap" flexShrink={1} columnGap={isTerminal ? undefined : 'sm'} rowGap={isTerminal ? undefined : 'sm'}>
         {children}
@@ -260,6 +262,7 @@ export const register: Register = on => {
               />
             </Box>
           </Box>
+          {showsModelAndEffort && (
           <Box key="toolbox-model" flexDirection="row">
             {label('Model')}
             {buttons([
@@ -292,6 +295,8 @@ export const register: Register = on => {
               />,
             ])}
           </Box>
+          )}
+          {showsModelAndEffort && (
           <Box key="toolbox-effort" flexDirection="row">
             {label('Effort')}
             {buttons(
@@ -312,6 +317,7 @@ export const register: Register = on => {
               )),
             )}
           </Box>
+          )}
           <Box key="toolbox-advisor" flexDirection="row">
             {label('Advisor')}
             {buttons([
