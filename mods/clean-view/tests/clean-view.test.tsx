@@ -135,15 +135,30 @@ describe('checklist', () => {
   })
 
 
-  test('before a plan arrives there is one Working line and no step rows', async ($, on) => {
+  test('the box stays hidden until a to-do list arrives, then appears', async ($, on) => {
     await startJob($, on)
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
-      expect(await ui.find({ type: 'Text', text: '✱ Working…' })).toBeDefined()
-      expect(await ui.find({ type: 'Text', text: /^Working$/ })).toBeUndefined()
-      expect(await ui.find({ type: 'Text', text: /Up next|Understand|Plan the steps/ })).toBeUndefined()
+      expect(await ui.find({ key: 'clean-view-frame' })).toBeUndefined()
+      expect(await ui.find({ type: 'Text', text: /Working/ })).toBeUndefined()
       await ui.unmount()
     }
+    await todo($, ['Read your notes', 'Write the page'])
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect(await ui.find({ key: 'clean-view-frame' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: '✱ Working on your request' })).toBeDefined()
+      await ui.unmount()
+    }
+  })
+
+  test('a question or a stuck job shows the box even with no to-do list', async ($, on) => {
+    await startJob($, on)
+    await $.turn.complete({ turnId: 't1', answer: 'Which one do you want?', reason: 'answer' } as never)
+    const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await ui.find({ key: 'clean-view-frame' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /Needs you/ })).toBeDefined()
+    await ui.unmount()
   })
 
   test('a finished job says how many steps it had, not the first step name', async ($, on) => {
@@ -245,6 +260,12 @@ describe('checklist', () => {
       return <Text>engine row</Text>
     })
     await startJob($, on)
+    // With no to-do list the checklist has nothing to say, so the engine's rows stay as they are.
+    const before = await $.ui.mount({ ...ROW, surface: 'terminal' })
+    expect(await before.find({ type: 'Text', text: 'engine row' })).toBeDefined()
+    await before.unmount()
+
+    await todo($, ['Read your notes', 'Write the page'])
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...ROW, surface })
       expect(await ui.find({ type: 'Text' })).toBeUndefined()
@@ -400,7 +421,7 @@ describe('replying to a question', () => {
     const next = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await next.find({ type: 'Text', text: /Needs you/ })).toBeUndefined()
     expect(await next.find({ key: 'clean-view-question' })).toBeUndefined()
-    expect(await next.find({ type: 'Text', text: '✱ Working…' })).toBeDefined()
+    expect(await next.find({ key: 'clean-view-frame' })).toBeUndefined()
     await next.unmount()
   })
 
@@ -459,6 +480,7 @@ describe('frame colours', () => {
 
   test('the checklist frame uses the same pastel for each state', async ($, on) => {
     await startJob($, on)
+    await todo($, ['Read your notes', 'Write the page'])
     const working = await $.ui.mount({ ...BAND, surface: 'desktop' })
     expect(await working.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderColor: PASTEL.working } })
     await working.unmount()
@@ -506,6 +528,7 @@ describe('tool summaries', () => {
       return <Text>{e.props.isExpanded ? 'expanded' : 'Ran 2 commands'}</Text>
     })
     await startJob($, on)
+    await todo($, ['Read your notes', 'Write the page'])
     const props = {
       calls: [{ tool: 'Bash', input: {}, isRunning: false, isErrored: true, isInterrupted: false }],
       isActive: false,
@@ -524,14 +547,15 @@ describe('tool summaries', () => {
 describe('on and off', () => {
   test('/view off hides the checklist and frees the tools; /view on brings it back', async ($, on) => {
     await startJob($, on)
+    await todo($, ['Read your notes', 'Write the page'])
     await $.command.run({ command: 'view', args: 'off', ...RUN })
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    expect(await ui.find({ type: 'Text', text: /Working…/ })).toBeUndefined()
+    expect(await ui.find({ type: 'Text', text: /Working on your request/ })).toBeUndefined()
     const free = await $.tool.call({ tool: 'Read', file_path: '/tmp/a.md' })
     expect(free.deny).toBeUndefined()
 
     await $.command.run({ command: 'view', args: 'on', ...RUN })
-    expect(await ui.find({ type: 'Text', text: '✱ Working…' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '✱ Working on your request' })).toBeDefined()
     await ui.unmount()
   })
 })
