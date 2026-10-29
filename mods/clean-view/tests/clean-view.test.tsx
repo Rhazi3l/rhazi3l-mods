@@ -358,6 +358,30 @@ describe('checklist', () => {
     }
   })
 
+  test("a helper agent's hand-back and finished lines are hidden, a failed one is not", async ($, on) => {
+    on('ui.render', { component: 'UserMessage' }, ($, e) => {
+      const { Text } = $.ui.resolve(e)
+      return <Text>engine row</Text>
+    })
+    await startJob($, on)
+    const row = (props: object) =>
+      $.ui.mount({ plugin: 'clean-view', component: 'UserMessage', surface: 'terminal', props: { text: 'x', isExpanded: false, ...props } } as never)
+    const shown = async (props: object) => {
+      const ui = await row(props)
+      const found = (await ui.find({ type: 'Text', text: 'engine row' })) !== undefined
+      await ui.unmount()
+      return found
+    }
+    expect(await shown({ origin: { kind: 'peer' }, from: { name: 'Explore' } })).toBe(false)
+    expect(await shown({ origin: { kind: 'task-notification' }, task: { id: 'a1', status: 'completed' } })).toBe(false)
+    expect(await shown({ origin: { kind: 'task-notification' }, task: { id: 'a1', status: 'failed' } })).toBe(true)
+    expect(await shown({ origin: { kind: 'task-notification' }, task: { id: 'a1', status: 'killed' } })).toBe(true)
+    expect(await shown({ origin: { kind: 'composer' } })).toBe(true)
+
+    await $.command.run({ command: 'view', args: 'off', ...RUN })
+    expect(await shown({ origin: { kind: 'peer' }, from: { name: 'Explore' } })).toBe(true)
+  })
+
   test('the spinner line is cut to its word once a plan exists, on the terminal only', async ($, on) => {
     const SPINNER = { plugin: 'clean-view', component: 'Spinner', props: { word: 'Fermenting', message: null, suffix: '…', mode: 'responding' } } as const
     on('ui.render', { component: 'Spinner' }, ($, e) => {

@@ -940,6 +940,18 @@ export const register: Register = on => {
     return <Text color={PASTEL.working}>{`${e.props.message ?? e.props.word}${e.props.suffix}`}</Text>
   })
 
+  // A helper agent's hand-back ("Message from @Explore") and the "Agent finished" line are
+  // plumbing: Claude reads them and answers in its own words. A task that failed or was
+  // stopped keeps its row, so a problem never goes quiet.
+  on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
+    if (await read($, showsToolRowsAtom)) return next(e)
+    const { from, task } = e.props
+    const isPlumbing = from !== undefined || (task !== undefined && task.status !== 'failed' && task.status !== 'killed')
+    if (!isPlumbing) return next(e)
+    const { Box } = $.ui.resolve(e)
+    return <Box />
+  })
+
   on('ui.render', { component: 'ToolProgress' }, async ($, e, next) => {
     if (await read($, showsToolRowsAtom)) return next(e)
     return next({ ...e, props: { ...e.props, hint: '' } })
