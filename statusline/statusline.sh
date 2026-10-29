@@ -45,7 +45,7 @@ SEP=" $(fg "$SUBTLE")│$RESET "
 
 # One jq pass for every field, split on the unit separator (a tab would
 # collapse empty fields when read).
-IFS=$'\x1f' read -r model model_id transcript effort ctx five five_at week week_at has_limits < <(
+IFS=$'\x1f' read -r model model_id transcript effort ctx five five_at week week_at has_limits pc_seen pc_warm pc_expires pc_ttl pc_recache < <(
   jq -r '[
     (.model.display_name // .model.id // "Claude"),
     (.model.id // ""),
@@ -56,7 +56,12 @@ IFS=$'\x1f' read -r model model_id transcript effort ctx five five_at week week_
     (.rate_limits.five_hour.resets_at // ""),
     (.rate_limits.seven_day.used_percentage // ""),
     (.rate_limits.seven_day.resets_at // ""),
-    (if .rate_limits then "yes" else "" end)
+    (if .rate_limits then "yes" else "" end),
+    (if .prompt_cache.caching_observed == false then "off" elif .prompt_cache.warm == null then "" else "yes" end),
+    (.prompt_cache.warm | if . == null then "" else tostring end),
+    (.prompt_cache.expires_at // ""),
+    (.prompt_cache.ttl // ""),
+    (.prompt_cache.recache_tokens_if_cold // "")
   ] | map(tostring) | join("\u001f")' <<<"$input"
 )
 
@@ -88,12 +93,13 @@ until_time() {
   else printf '%dm' "$m"; fi
 }
 
-# Prompt cache. Warm while the main thread's last response is under an hour old (Claude
-# Code asks for the one-hour cache on a subscription; pay-as-you-go keys get five minutes).
-# Read from the transcript, so it needs no mod (and no GNU date, so it runs on macOS too). A cold chat shows the tokens resuming it
-# would write back into the cache against the tokens a new chat starts with (the first
-# response's prompt: system prompt, tools, memory). Anthropic publishes no conversion from
-# tokens to the 5h or weekly percentage, so none is shown.
+# Prompt cache. Claude Code (2.1.251 and later) reports it in `prompt_cache`: whether the cached
+# prefix is still warm, its lifetime (5m or 1h, so it is right for whichever the account gets), when it
+# goes cold, and the tokens re-caching it would write. Older versions send nothing, and then the figures
+# are worked out from the transcript instead: warm while the main thread's last response is under an
+# hour old. A cold chat shows the tokens resuming it would write back into the cache against the tokens a
+# new chat starts with (the first response's prompt: system prompt, tools, memory). Anthropic publishes
+# no conversion from tokens to the 5h or weekly percentage, so none is shown.
 CACHE_TTL=3600
 
 # 850 -> 850, 174404 -> 174k, 1250000 -> 1.2M
@@ -104,12 +110,40 @@ tokens_short() {
   else printf '%d' "$n"; fi
 }
 
-cache_part() {
+# The fields of each main-thread response: its time and the tokens it was answered over.
+fields='fromjson? | select(.type == "assistant" and (.isSidechain | not) and .message.usage)
+  | [(.timestamp | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601), (.message.usage | .input_tokens + .cache_read_input_tokens + .cache_creation_input_tokens + .output_tokens)] | @tsv'
+
+# What a new chat starts with: the very first response's prompt (needs the transcript).
+new_chat_tokens() {
   [[ -r $transcript ]] || return
-  local last first stamp tokens first_tokens at left
-  # The fields of each main-thread response: its time and the tokens it was answered over.
-  local fields='fromjson? | select(.type == "assistant" and (.isSidechain | not) and .message.usage)
-    | [(.timestamp | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601), (.message.usage | .input_tokens + .cache_read_input_tokens + .cache_creation_input_tokens + .output_tokens)] | @tsv'
+  local first
+  first=$(grep -m5 '"type":"assistant"' "$transcript" | jq -Rr "$fields" 2>/dev/null | head -n 1)
+  printf '%s' "${first##*$'\t'}"
+}
+
+cache_part() {
+  # From Claude Code's own figures.
+  if [[ $pc_seen == off ]]; then return; fi
+  if [[ $pc_seen == yes ]]; then
+    local left=$((${pc_expires:-0} - NOW)) fresh
+    if [[ $pc_warm == true ]] && ((left > 0)); then
+      local note=""
+      [[ $pc_ttl == 5m ]] && note=" $(fg "$DIM")(5m cache)$RESET"
+      printf '%s●%s %swarm %s%s%s' "$(fg "$GREEN")" "$RESET" "$(fg "$TEXT")" "$(until_time $((NOW + left)))" "$RESET" "$note"
+      return
+    fi
+    fresh=$(new_chat_tokens)
+    local text="○ cold"
+    [[ -n $pc_recache ]] && text+=" · resume $(tokens_short "$pc_recache") tokens"
+    [[ -n $fresh ]] && text+=" · new chat $(tokens_short "$fresh")"
+    printf '%s%s%s' "$(fg "$DIM")" "$text" "$RESET"
+    return
+  fi
+
+  # An older Claude Code: worked out from the transcript, assuming the one-hour cache.
+  [[ -r $transcript ]] || return
+  local last stamp tokens first_tokens at left
   last=$(tail -n 80 "$transcript" | jq -Rr "$fields" 2>/dev/null | tail -n 1)
   [[ -n $last ]] || return
   stamp=${last%%$'\t'*}
@@ -121,8 +155,7 @@ cache_part() {
     printf '%s●%s %swarm %s%s' "$(fg "$GREEN")" "$RESET" "$(fg "$TEXT")" "$(until_time $((NOW + left)))" "$RESET"
     return
   fi
-  first=$(grep -m5 '"type":"assistant"' "$transcript" | jq -Rr "$fields" 2>/dev/null | head -n 1)
-  first_tokens=${first##*$'\t'}
+  first_tokens=$(new_chat_tokens)
   printf '%s○ cold · resume %s tokens · new chat %s%s' "$(fg "$DIM")" "$(tokens_short "$tokens")" "$(tokens_short "${first_tokens:-0}")" "$RESET"
 }
 
