@@ -269,7 +269,7 @@ describe('checklist', () => {
       expect(await pane.find({ type: 'Text', text: '/tmp/notes/brand.md' })).toBeDefined()
       expect(await pane.find({ type: 'Text', text: 'hugo build --minify' })).toBeDefined()
       expect(await pane.find({ type: 'Text', text: 'bash: hugo: command not found' })).toMatchObject({ props: { color: PASTEL.error } })
-      expect(await pane.find({ type: 'Text', text: /2 actions · 1 didn't work/ })).toBeDefined()
+      expect(await pane.find({ type: 'Text', text: /2 actions · 1 error/ })).toBeDefined()
       await pane.unmount()
     }
 

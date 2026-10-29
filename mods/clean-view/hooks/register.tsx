@@ -883,7 +883,7 @@ export const register: Register = on => {
     const failed = c.actions.filter(a => a.isFailed).length
     const summary = [
       `${c.actions.length} action${c.actions.length === 1 ? '' : 's'}`,
-      failed > 0 ? `${failed} didn't work` : null,
+      failed > 0 ? `${failed} error${failed === 1 ? '' : 's'}` : null,
       elapsed,
     ]
       .filter(Boolean)
