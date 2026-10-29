@@ -691,7 +691,7 @@ export const register: Register = on => {
     const showsTrail = mode === 'guided' && latest !== undefined && c.phase !== 'done'
     // The latest action sits on the step's own row, after its name. The terminal's name column then spans the room
     // to the bar (icon, bar and label take the rest), so every row's bar stays aligned.
-    const terminalNameCells = showsTrail ? Math.max(nameWidth + 1, width - (2 + METER + LABEL_CELLS)) : nameWidth + 1
+    const terminalNameCells = showsTrail ? Math.max(nameWidth + 1, width - (2 + METER + LABEL_CELLS) - 1) : nameWidth + 1
 
     const rows = c.tasks.flatMap((task, i) => {
       if (i < windowStart || i >= windowEnd) return []
@@ -865,7 +865,11 @@ export const register: Register = on => {
               <Text>{a.label}</Text>
             </Box>
             {a.detail !== '' && <Text dimColor wrap="truncate-end">{` · ${a.detail}`}</Text>}
-            {a.isFailed && <Text color={PASTEL.error}>{" · didn't work"}</Text>}
+            {a.isFailed && (
+              <Box flexShrink={0}>
+                <Text color={PASTEL.error}>{" · didn't work"}</Text>
+              </Box>
+            )}
           </Box>
           {a.full !== '' && a.full !== a.detail && (
             <Box paddingLeft={3}>

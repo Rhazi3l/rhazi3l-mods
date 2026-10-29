@@ -93,6 +93,8 @@ const CHECKLIST_TOOLS = new Set([
   // The desktop app's own plan tools stand in for the to-do list.
   'mcp__ccd_turn__update_plan',
   'mcp__ccd_turn__wrap_up',
+  // A helper agent's own hand-back call: plumbing, not work.
+  'SubagentHandback',
 ])
 
 function basename(path: unknown): string {

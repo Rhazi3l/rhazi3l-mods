@@ -404,6 +404,10 @@ describe('checklist', () => {
     await desktop.unmount()
   })
 
+  test("a helper agent's own hand-back call gets no line", async () => {
+    expect(describeAction('SubagentHandback', { report: '40' }, PREFIX)).toBeNull()
+  })
+
   test('the latest action shows on the step in progress', async ($, on) => {
     await startJob($, on)
     await todo($, ['Read your notes', 'Write the page'])
