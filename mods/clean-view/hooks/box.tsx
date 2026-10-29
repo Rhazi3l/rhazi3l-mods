@@ -125,7 +125,7 @@ export async function drawBox(
   // question takes one row less; a long question wraps in the room beside them.
   const askRows = waitsForReply
     ? [
-        <Box key="clean-view-ask" flexDirection="row" flexWrap="wrap" alignItems="center" gap={1} paddingY={isTerminal ? undefined : 'xs'}>
+        <Box key="clean-view-ask" flexDirection="row" flexWrap="wrap" alignItems="center" gap={1} paddingY={isTerminal ? undefined : 'sm'}>
           <Box key="clean-view-question" flexGrow={1} flexShrink={1}>
             <Text wrap="wrap">{c.question}</Text>
           </Box>
