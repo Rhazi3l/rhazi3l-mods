@@ -153,6 +153,25 @@ describe('checklist', () => {
     }
   })
 
+  test('with no to-do list the Working line carries the latest action and a count', async ($, on) => {
+    await startJob($, on)
+    for (const surface of SURFACES) {
+      const bare = await $.ui.mount({ ...BAND, surface })
+      expect(await bare.find({ type: 'Text', text: '✱ Working…' })).toBeDefined()
+      expect(await bare.find({ key: 'clean-view-trail' })).toBeUndefined()
+      await bare.unmount()
+    }
+    await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/brand.md' })
+    await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/colours.md' })
+    for (const surface of SURFACES) {
+      const ui = await $.ui.mount({ ...BAND, surface })
+      expect(await ui.find({ type: 'Text', text: '✱ Working…' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /· 📄 colours\.md/ })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: ' · 2 actions' })).toBeDefined()
+      await ui.unmount()
+    }
+  })
+
   test('a job with no to-do list ends green with a plain All done', async ($, on) => {
     await startJob($, on)
     await $.turn.complete({ turnId: 't1', answer: 'Done.', reason: 'answer' } as never)

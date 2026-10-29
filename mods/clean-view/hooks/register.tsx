@@ -538,7 +538,19 @@ export const register: Register = on => {
       </Box>
     )
     const elapsed = formatDuration((c.finishedAt ?? now) - c.startedAt)
-    let header = (
+    // With no to-do list the header is the only line, so it carries the latest action the way a step's row does.
+    const doing = c.tasks.length === 0 ? c.actions.findLast(a => !a.isHelper) : undefined
+    const doingCount = c.actions.filter(a => !a.isHelper).length
+    let header = doing ? (
+      <Box flexDirection="row" flexShrink={1}>
+        <Text bold color={PASTEL.working}>{'✱ Working…'}</Text>
+        <Box flexDirection="row" flexShrink={1} marginLeft={1}>
+          <Text dimColor wrap="truncate-end">{`· ${doing.icon} ${doing.detail || doing.label}`}</Text>
+          {doing.isFailed && <Text color={PASTEL.error}>{" · didn't work"}</Text>}
+          {doingCount > 1 && <Text dimColor>{` · ${doingCount} actions`}</Text>}
+        </Box>
+      </Box>
+    ) : (
       <Text bold color={PASTEL.working} wrap="truncate-end">
         {c.tasks.length === 0 ? '✱ Working…' : `✱ ${DEFAULT_TITLE}`}
       </Text>
