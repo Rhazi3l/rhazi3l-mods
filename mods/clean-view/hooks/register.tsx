@@ -761,6 +761,9 @@ export const register: Register = on => {
     const firstUpcoming = c.tasks.findIndex(t => t.status === 'upcoming')
     const latest = c.actions.findLast(a => !a.isHelper)
     const showsTrail = mode === 'guided' && latest !== undefined && c.phase !== 'done'
+    // The latest action sits on the step's own row, after its name. The terminal's name column then spans the room
+    // to the bar (icon, bar and label take the rest), so every row's bar stays aligned.
+    const terminalNameCells = showsTrail ? Math.max(nameWidth + 1, width - (2 + METER + LABEL_CELLS)) : nameWidth + 1
 
     const rows = c.tasks.flatMap((task, i) => {
       if (i < windowStart || i >= windowEnd) return []
@@ -778,19 +781,17 @@ export const register: Register = on => {
               : 'Up next'
       const count = c.actions.filter(a => a.step === task.name).length
       const hasTrail = isActive && showsTrail && latest !== undefined
-      // Off the terminal the latest action sits on the step's own row, after its name; the terminal's fixed columns keep it on a line below.
-      const trailInline = hasTrail && !isTerminal
       const trailText = latest ? `${latest.icon} ${latest.detail || latest.label}` : ''
       const row = (
         <Box key={`task-${task.id}`} flexDirection="row" alignItems="center">
           <Text color={task.status === 'done' ? PASTEL.done : isActive ? PASTEL.working : undefined} dimColor={task.status === 'upcoming'}>
             {`${icon} `}
           </Text>
-          <Box key="name" {...(isTerminal ? { width: nameWidth + 1, flexShrink: 0 } : { flexGrow: 1, flexShrink: 1 })}>
+          <Box key="name" {...(isTerminal ? { width: terminalNameCells, flexShrink: 0 } : { flexGrow: 1, flexShrink: 1 })}>
             <Text bold={isActive} dimColor={!isActive} wrap="truncate-end">
               {trimToWidth(task.name, nameWidth)}
             </Text>
-            {trailInline && latest && (
+            {hasTrail && latest && (
               <Box key="clean-view-trail" flexDirection="row" flexShrink={1} marginLeft={1}>
                 <Text dimColor wrap="truncate-end">{`· ${trailText}`}</Text>
                 {latest.isFailed && <Text color={PASTEL.error}>{" · didn't work"}</Text>}
@@ -820,15 +821,7 @@ export const register: Register = on => {
           </Box>
         </Box>
       )
-      if (!hasTrail || trailInline || !latest) return [row]
-      return [
-        row,
-        <Box key="clean-view-trail" flexDirection="row" paddingLeft={2}>
-          <Text dimColor wrap="truncate-end">{`↳ ${trailText}`}</Text>
-          {latest.isFailed && <Text color={PASTEL.error}>{" · didn't work"}</Text>}
-          {count > 1 && <Text dimColor>{` · ${count} actions`}</Text>}
-        </Box>,
-      ]
+      return [row]
     })
 
     // What the window leaves out, in one line: finished steps above it, steps still to come below it.
