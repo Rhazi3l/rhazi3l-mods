@@ -120,11 +120,11 @@ function serverName(server: string): string {
 
 /**
  * The one-line summary of a tool call for the technical layer, or null for a
- * call that never gets a line (the checklist's own tools).
+ * call that never gets a line (the to-do tools, which the checklist itself shows).
  */
-export function describeAction(tool: string, input: unknown, ownPrefix: string): ActionSummary | null {
+export function describeAction(tool: string, input: unknown): ActionSummary | null {
   const args = (input ?? {}) as Record<string, unknown>
-  if (CHECKLIST_TOOLS.has(tool) || tool.startsWith(ownPrefix)) return null
+  if (CHECKLIST_TOOLS.has(tool)) return null
 
   switch (tool) {
     case 'Skill':

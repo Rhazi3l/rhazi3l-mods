@@ -9,7 +9,6 @@ import { asksSomething, plannedTodos, stuckText, waitingText } from '../hooks/ch
 import { noteScroll, keepInView } from '../hooks/panes'
 import { cleanName, describeAction, extractQuestion, quickReplies } from '../hooks/text'
 
-const PREFIX = 'mcp__clean-view__'
 const SURFACES = ['terminal', 'desktop'] as const
 const RUN = { origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as const
 
@@ -64,7 +63,6 @@ async function startSession($: Engine, on: On) {
   on('prompt.submit', ($, e) => (submitted.push(e.text), { text: e.text }))
   on('turn.start', ($, e) => ({ turnId: e.turnId }))
   on('turn.complete', ($, e) => ({ text: e.answer }))
-  on('prompt.compose', () => ({ sections: [] }))
   on('classic.Notification', () => ({}))
   on('tool.call', { tool: 'TodoWrite' }, ($, e) => ({ result: { oldTodos: [], newTodos: e.todos } }))
   on('tool.call', { tool: 'Read' }, () => ({ result: { type: 'text' } as never }))
@@ -108,26 +106,25 @@ describe('plain names', () => {
   })
 
   test('the technical layer names skills, websites, connectors and commands', async () => {
-    expect(describeAction('Skill', { skill: 'omarchy' }, PREFIX)?.detail).toBe('omarchy')
-    expect(describeAction('WebFetch', { url: 'https://wiki.hyprland.org/Configuring/?x=1' }, PREFIX)?.detail).toBe(
+    expect(describeAction('Skill', { skill: 'omarchy' })?.detail).toBe('omarchy')
+    expect(describeAction('WebFetch', { url: 'https://wiki.hyprland.org/Configuring/?x=1' })?.detail).toBe(
       'wiki.hyprland.org/Configuring',
     )
-    expect(describeAction('mcp__claude_ai_Gmail__search_threads', {}, PREFIX)?.detail).toBe('Gmail → search threads')
-    expect(describeAction('Bash', { command: 'git push origin main', description: 'Push the config' }, PREFIX)?.detail).toBe(
+    expect(describeAction('mcp__claude_ai_Gmail__search_threads', {})?.detail).toBe('Gmail → search threads')
+    expect(describeAction('Bash', { command: 'git push origin main', description: 'Push the config' })?.detail).toBe(
       'Push the config',
     )
-    expect(describeAction('Artifact', { action: 'read', url: 'https://claude.ai/artifact/7UE1qe7SS7CN2KMjmWHeDG' }, PREFIX)).toMatchObject({
+    expect(describeAction('Artifact', { action: 'read', url: 'https://claude.ai/artifact/7UE1qe7SS7CN2KMjmWHeDG' })).toMatchObject({
       label: 'Read an artifact',
       detail: 'claude.ai/artifact/7UE1qe7SS7CN2KMjmWHeDG',
     })
-    expect(describeAction('Artifact', { file_path: '/tmp/page.html' }, PREFIX)?.label).toBe('Published an artifact')
-    expect(describeAction('ArtifactData', { action: 'query', collection: 'notes' }, PREFIX)).toMatchObject({
+    expect(describeAction('Artifact', { file_path: '/tmp/page.html' })?.label).toBe('Published an artifact')
+    expect(describeAction('ArtifactData', { action: 'query', collection: 'notes' })).toMatchObject({
       label: "Used an artifact's data",
       detail: 'query notes',
     })
-    expect(describeAction('SomeNewTool', {}, PREFIX)).toMatchObject({ label: 'Used a tool', detail: 'Some new tool' })
-    expect(describeAction(`${PREFIX}anything`, {}, PREFIX)).toBeNull()
-    expect(describeAction('TodoWrite', {}, PREFIX)).toBeNull()
+    expect(describeAction('SomeNewTool', {})).toMatchObject({ label: 'Used a tool', detail: 'Some new tool' })
+    expect(describeAction('TodoWrite', {})).toBeNull()
   })
 })
 
@@ -672,7 +669,7 @@ describe('checklist', () => {
   })
 
   test("a helper agent's own hand-back call gets no line", async () => {
-    expect(describeAction('SubagentHandback', { report: '40' }, PREFIX)).toBeNull()
+    expect(describeAction('SubagentHandback', { report: '40' })).toBeNull()
   })
 
   test('the latest action shows on the step in progress', async ($, on) => {

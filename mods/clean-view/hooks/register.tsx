@@ -38,19 +38,12 @@ const errorsOnlyAtom = atom({ plugin: 'clean-view', key: 'errorsOnly' } as const
 /** Clean View off leaves the transcript as the engine draws it: tool rows, notes and all. */
 const isOffAtom = derive([isOnAtom], isOn => !isOn)
 
-const OWN_PREFIX = 'mcp__clean-view__'
 const PLAN_TOOL = 'mcp__ccd_turn__update_plan'
 /** A job shorter than this ends without an alert: the person is still looking. */
 const ALERT_AFTER_MS = 20_000
 const TICK_MS = 250
 const COLLAPSE_MS = 5000
 const FAILS_BEFORE_STUCK = 3
-
-const PROMPT_SECTION = `# Clean View
-The person sees your to-do list as a plain-English checklist; tool output is hidden.
-- For work of two or more steps, start with a to-do list (TodoWrite, TaskCreate, or the app's own plan tool, update_plan) and keep it current, marking each step completed as soon as it is done. Skip the list for a quick question.
-- Write every step name in plain English, under 40 characters, starting with a verb, like "Build the pricing section". No file paths, file names, commands, code or tool names.
-- Answer first, in as few words as possible. Do not narrate steps or repeat results the person can open in Details. Text you write between tool calls is hidden, so keep any finding, risk or choice you made for the closing summary. If you need the person's decision, stop and ask it as the last paragraph, ending with a question mark. End with a short plain-English summary of what changed and anything they must decide.`
 
 // Module state: rebuilt on every reload (session.start fires again then).
 let ticker: Timer | undefined
@@ -131,14 +124,6 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('prompt.compose', async ($, e, next) => {
-    const composed = await next(e)
-    if (await read($, isOffAtom)) return composed
-    return {
-      sections: [...composed.sections, { id: 'clean-view', text: PROMPT_SECTION, scope: 'session' as const }],
-    }
-  })
-
   on('session.end', async ($, e, next) => {
     if (e.reason === 'clear') $.clock.after(200, () => void restoreAfterClear($))
     return next(e)
@@ -187,10 +172,9 @@ export const register: Register = on => {
   // checklist, and the action trail.
   on('tool.call', async ($, e, next) => {
     const tool = String(e.tool)
-    if (tool.startsWith(OWN_PREFIX)) return next(e)
     if (e.agentId !== undefined) {
       // A helper agent's call: kept for the Details pane, nothing else.
-      const summary = describeAction(tool, e, OWN_PREFIX)
+      const summary = describeAction(tool, e)
       if (!summary) return next(e)
       const id = e.tool_use_id ?? newId('a')
       const helperStart = await $.clock.now()
@@ -211,7 +195,7 @@ export const register: Register = on => {
       return ran
     }
 
-    const summary = describeAction(tool, e, OWN_PREFIX)
+    const summary = describeAction(tool, e)
     const actionId = e.tool_use_id ?? newId('a')
     const actionStart = await $.clock.now()
     await update($, checklistAtom, c => {
