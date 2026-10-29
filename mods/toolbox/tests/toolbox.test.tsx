@@ -162,7 +162,7 @@ describe('toolbox', () => {
     await $.command.run({ command: 'toolbox', args: '', ...RUN })
     const desktop = await $.ui.mount({ ...BAND, surface: 'desktop' })
     expect(await desktop.find({ key: 'toolbox-panel' })).toMatchObject({ props: { gap: 'xs' } })
-    expect(JSON.stringify(await desktop.find({ key: 'toolbox-advisor' }))).toContain('"columnGap":"xs"')
+    expect(JSON.stringify(await desktop.find({ key: 'toolbox-advisor' }))).toContain('"columnGap":"sm"')
     await desktop.unmount()
     const terminal = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(JSON.stringify(await terminal.find({ key: 'toolbox-panel' }))).not.toContain('"gap"')

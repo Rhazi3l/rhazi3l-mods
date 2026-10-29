@@ -227,7 +227,7 @@ export const register: Register = on => {
     // The desktop app has its own model and effort pickers, so the panel leaves those two rows to it.
     const showsModelAndEffort = e.surface !== 'desktop'
     const buttons = (children: RenderChildren) => (
-      <Box flexDirection="row" flexWrap="wrap" flexShrink={1} columnGap={isTerminal ? undefined : 'xs'} rowGap={isTerminal ? undefined : 'xs'}>
+      <Box flexDirection="row" flexWrap="wrap" flexShrink={1} columnGap={isTerminal ? undefined : 'sm'} rowGap={isTerminal ? undefined : 'xs'}>
         {children}
       </Box>
     )
@@ -242,7 +242,7 @@ export const register: Register = on => {
           borderStyle="round"
           borderColor={PASTEL.working}
           paddingX={isTerminal ? 1 : 'sm'}
-          paddingY={isTerminal ? undefined : 'xs'}
+          paddingY={isTerminal ? undefined : 'sm'}
           gap={isTerminal ? undefined : 'xs'}
         >
           {showsModelAndEffort && (
@@ -327,7 +327,7 @@ export const register: Register = on => {
                 installed.map(({ mod, isOn }) => (
                   <Button
                     key={`mod-${mod.id}`}
-                    variant={isOn ? 'primary' : 'secondary'}
+                    variant="secondary"
                     onPress={async () => {
                       const now = (await installedMods($)).find(s => s.mod.id === mod.id)
                       $.ui.toast(await switchMod($, mod, !(now?.isOn ?? isOn)))
