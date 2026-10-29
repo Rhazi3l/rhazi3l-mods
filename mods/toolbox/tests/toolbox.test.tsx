@@ -144,7 +144,7 @@ describe('toolbox', () => {
     }
   })
 
-  test('the Info button carries the context figure, dim until 80% then amber and red', async ($, on) => {
+  test('on the desktop the Info button carries the context figure, dim until 80% then amber and red; the terminal leaves it to the status line', async ($, on) => {
     on('session.measure', (_$, e) => ({ changed: e.changed }) as never)
     await startSession($, on)
     for (const surface of SURFACES) {
@@ -159,6 +159,9 @@ describe('toolbox', () => {
       expect(figure).toBeDefined()
       expect(figure?.props.color).toBe(color)
       await footer.unmount()
+      const terminal = await $.ui.mount({ ...FOOTER, surface: 'terminal' })
+      expect(await terminal.find({ type: 'Text', text: ` ${percent}%` })).toBeUndefined()
+      await terminal.unmount()
     }
   })
 

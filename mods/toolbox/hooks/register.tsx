@@ -1,6 +1,7 @@
 // Info: a "✦ Info ▾" button at the right of the prompt footer that
 // opens a small panel in the corner above it for the model, effort, the advisor
-// and the other mods that are installed. The button also carries how full the context is.
+// and the other mods that are installed. On the desktop the button also carries how full the context is
+// (the terminal's status line has that).
 // Usage figures and the prompt cache belong in Claude Code's own status line setting, not here.
 // Colours are the mods' shared palette (palette.ts).
 
@@ -165,7 +166,7 @@ export const register: Register = on => {
             <Text color={isOpen ? PASTEL.working : 'text'} bold={isOpen}>
               Info
             </Text>
-            {context !== null && (
+            {!isTerminal && context !== null && (
               <Text dimColor={context < 80} color={context < 80 ? undefined : contextColor(context)}>{` ${Math.floor(context)}%`}</Text>
             )}
             {isTerminal && <Text color={isOpen ? PASTEL.working : PASTEL.stopped}>{isOpen ? ' ▴' : ' ▾'}</Text>}
