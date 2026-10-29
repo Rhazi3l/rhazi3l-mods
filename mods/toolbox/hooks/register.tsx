@@ -227,7 +227,7 @@ export const register: Register = on => {
     // The desktop app has its own model and effort pickers, so the panel leaves those two rows to it.
     const showsModelAndEffort = e.surface !== 'desktop'
     const buttons = (children: RenderChildren) => (
-      <Box flexDirection="row" flexWrap="wrap" flexShrink={1} columnGap={isTerminal ? undefined : 'sm'} rowGap={isTerminal ? undefined : 'sm'}>
+      <Box flexDirection="row" flexWrap="wrap" flexShrink={1} columnGap={isTerminal ? undefined : 'xs'} rowGap={isTerminal ? undefined : 'xs'}>
         {children}
       </Box>
     )
@@ -241,27 +241,10 @@ export const register: Register = on => {
           flexDirection="column"
           borderStyle="round"
           borderColor={PASTEL.working}
-          paddingX={isTerminal ? 1 : 'md'}
-          paddingY={isTerminal ? undefined : 'sm'}
-          gap={isTerminal ? undefined : 'sm'}
+          paddingX={isTerminal ? 1 : 'sm'}
+          paddingY={isTerminal ? undefined : 'xs'}
+          gap={isTerminal ? undefined : 'xs'}
         >
-          <Box flexDirection="row" justifyContent="space-between">
-            <Box flexGrow={1} flexShrink={1}>
-              <Text bold color={PASTEL.working} wrap="truncate-end">
-                ✦ Info
-              </Text>
-            </Box>
-            <Box flexShrink={0}>
-              <Button
-                key="toolbox-close"
-                plain
-                role="dismiss"
-                label="close"
-                hotkey="x"
-                onPress={() => update($, toolboxOpenAtom, () => false)}
-              />
-            </Box>
-          </Box>
           {showsModelAndEffort && (
           <Box key="toolbox-model" flexDirection="row">
             {label('Model')}
