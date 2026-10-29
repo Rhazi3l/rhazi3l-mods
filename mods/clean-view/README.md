@@ -21,7 +21,7 @@ A plain-English checklist above the prompt in place of Claude Code's technical r
 
 ## Where the steps come from
 
-Claude Code's own to-do list: `TodoWrite`, `TaskCreate` and `TaskUpdate`, or the desktop app's `update_plan` tool (a full list, or `advance`, `done` and `start` updates). Clean View adds no tools of its own and holds none back. A short section it adds to the system prompt asks for plain step names, answers that lead with the result, any finding or choice kept for the closing summary, and a question as the last paragraph when it needs your decision.
+Claude Code's own to-do list: `TodoWrite`, `TaskCreate` and `TaskUpdate`, or the desktop app's `update_plan` tool (a full list, or `advance`, `done` and `start` updates). Clean View adds no tools of its own and holds none back. Where another plugin stops the system prompt being extended (a managed machine can), that section is not applied and Claude is not asked for plain step names or short notes; the box still follows the to-do calls it makes. A short section it adds to the system prompt asks for plain step names, answers that lead with the result, any finding or choice kept for the closing summary, and a question as the last paragraph when it needs your decision.
 
 ## Details
 

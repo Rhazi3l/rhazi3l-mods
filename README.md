@@ -42,7 +42,7 @@ then `/reload-plugins` in any open session.
 
 ## Pairs well with a status line
 
-The Info panel shows no usage figures, so they don't sit in two places. Claude Code's own status line is the place for them, and for the prompt cache: the `statusLine` setting in `~/.claude/settings.json` runs a script of yours and draws its first line under the prompt. It is a Claude Code setting, not a mod, so it isn't in this repository. For example, with a script that prints the model, effort, context and rate limits (the five-hour and seven-day percentages are the nearest measure of what your plan counts):
+The Info panel shows no usage figures (its button carries only the context fill), so they don't sit in two places. Claude Code's own status line is the place for them, and for the prompt cache: the `statusLine` setting in `~/.claude/settings.json` runs a script of yours and draws its first line under the prompt. It is a Claude Code setting, not a mod, so it isn't in this repository. For example, with a script that prints the model, effort, context and rate limits (the five-hour and seven-day percentages are the nearest measure of what your plan counts):
 
 My script is in `statusline/statusline.sh`: plan (Pro, Max, Enterprise, from `~/.claude.json`), model, effort, context bar, the 5h and weekly figures with their reset times, and last the prompt cache, in the mods' colours. It needs `jq`, and runs on Linux and macOS (it avoids bash 4 and GNU `date`). On a new computer, copy it and add the setting (`refreshInterval` re-runs it every 60 seconds so a quiet chat turns cold on screen):
 
