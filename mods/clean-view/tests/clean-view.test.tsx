@@ -237,6 +237,19 @@ describe('checklist', () => {
     expect(JSON.stringify(gone)).toContain('/view details')
   })
 
+  test('Details shows what each tool answered, whole for a failure and cut when very long', async ($, on) => {
+    on('tool.call', { tool: 'Bash' }, () => ({ result: 'ok', text: 'line one\nline two' }) as never)
+    on('tool.call', { tool: 'Read' }, () => ({ result: 'ok', text: 'x'.repeat(5000) }) as never)
+    await startJob($, on)
+    await $.tool.call({ tool: PLAN, steps: ['Look around'] } as never)
+    await $.tool.call({ tool: 'Bash', command: 'ls', description: 'List files' })
+    await $.tool.call({ tool: 'Read', file_path: '/tmp/big.txt' })
+    const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    expect(await pane.find({ type: 'Text', text: 'line one\nline two' })).toBeDefined()
+    expect(await pane.find({ type: 'Text', text: /… 1000 more characters$/ })).toBeDefined()
+    await pane.unmount()
+  })
+
   test('Details lists every step and action in full, and leaves the transcript clean', async ($, on) => {
     on('ui.open', () => ({ value: { isPlaced: true } }))
     on('tool.call', { tool: 'Bash' }, () => ({ result: 'failed', isError: true, text: 'bash: hugo: command not found\nmore' }) as never)

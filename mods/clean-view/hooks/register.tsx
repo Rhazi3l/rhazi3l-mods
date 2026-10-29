@@ -17,6 +17,7 @@ import {
   extractQuestion,
   describeAction,
   describeFull,
+  clipOutput,
   firstLine,
   formatDuration,
   isUserRefusal,
@@ -214,6 +215,10 @@ function recordAction(c: Checklist, action: ChecklistAction): Checklist {
 
 function markFailed(c: Checklist, id: string, note: string): Checklist {
   return { ...c, actions: c.actions.map(a => (a.id === id ? { ...a, isFailed: true, note } : a)) }
+}
+
+function setOutput(c: Checklist, id: string, output: string): Checklist {
+  return { ...c, actions: c.actions.map(a => (a.id === id ? { ...a, output } : a)) }
 }
 
 /** The step a new action belongs to: the one in progress, else the last one started. */
@@ -457,10 +462,12 @@ export const register: Register = on => {
       const id = e.tool_use_id ?? newId('a')
       await update($, checklistAtom, c =>
         isRunningPhase(c)
-          ? recordAction(c, { id, ...summary, full: describeFull(tool, e), step: currentStep(c), isHelper: true, isFailed: false, note: '' })
+          ? recordAction(c, { id, ...summary, full: describeFull(tool, e), step: currentStep(c), isHelper: true, isFailed: false, note: '', output: '' })
           : c,
       )
       const ran = await next(e)
+      const output = clipOutput(ran.deny ?? ran.text)
+      await update($, checklistAtom, c => setOutput(c, id, output))
       if (ran.deny !== undefined || ran.isError === true) {
         const note = firstLine(ran.deny ?? ran.text)
         await update($, checklistAtom, c => markFailed(c, id, note))
@@ -475,17 +482,19 @@ export const register: Register = on => {
     if (isGated) return { deny: GATE_TEXT }
 
     const summary = describeAction(tool, e, OWN_PREFIX)
+    const actionId = e.tool_use_id ?? newId('a')
     await update($, checklistAtom, c => {
       let changed = tool === 'AskUserQuestion' ? setNeedsYou(c, REASON_QUESTION) : clearNeedsYou(c)
       if (summary) {
         changed = recordAction(changed, {
-          id: e.tool_use_id ?? newId('a'),
+          id: actionId,
           ...summary,
           full: describeFull(tool, e),
           step: currentStep(changed),
           isHelper: false,
           isFailed: false,
           note: '',
+          output: '',
         })
       }
       return changed
@@ -494,9 +503,10 @@ export const register: Register = on => {
     const ran = await next(e)
     const isFailed = ran.deny !== undefined || ran.isError === true
     const failText = ran.deny ?? (ran.isError ? ran.text : undefined)
+    const output = clipOutput(ran.deny ?? ran.text)
 
     await update($, checklistAtom, c => {
-      let changed = c
+      let changed = setOutput(c, actionId, output)
       if (tool === 'AskUserQuestion' || changed.needsYouReason === REASON_PERMISSION) changed = clearNeedsYou(changed)
 
       if (!isFailed) {
@@ -907,7 +917,14 @@ export const register: Register = on => {
               </Text>
             </Box>
           )}
-          {a.note !== '' && (
+          {a.output !== '' && (
+            <Box key={`output-${a.id}`} paddingLeft={3}>
+              <Text color={a.isFailed ? PASTEL.error : 'subtle'} wrap="wrap">
+                {a.output}
+              </Text>
+            </Box>
+          )}
+          {a.output === '' && a.note !== '' && (
             <Box paddingLeft={3}>
               <Text color={PASTEL.error} wrap="wrap">
                 {a.note}

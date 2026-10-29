@@ -28,6 +28,8 @@ export type ChecklistAction = {
   isHelper: boolean
   /** The first line of what went wrong, for a failed action. */
   note: string
+  /** What the tool answered, as Claude read it, cut at 4,000 characters; empty until it answers. */
+  output: string
 }
 
 export type Checklist = {

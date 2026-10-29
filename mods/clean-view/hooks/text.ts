@@ -255,6 +255,13 @@ export function describeFull(tool: string, input: unknown): string {
   return ''
 }
 
+/** A tool's answer kept for the Details pane: the head of it, with a note of what was cut. */
+export const OUTPUT_MAX = 4000
+export function clipOutput(text: unknown, max = OUTPUT_MAX): string {
+  const whole = String(text ?? '').replace(/\s+$/, '')
+  return whole.length <= max ? whole : `${whole.slice(0, max)}\n… ${whole.length - max} more characters`
+}
+
 /** The first line of an error, for a failed action. */
 export function firstLine(text: unknown, max = 160): string {
   const line = String(text ?? '').split('\n').find(part => part.trim() !== '') ?? ''
