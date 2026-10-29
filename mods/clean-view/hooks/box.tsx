@@ -107,8 +107,18 @@ export async function drawBox(
     )
   }
 
+  // The desktop's Details button is taller than a line, so the first row under it needs room, unless the header
+  // stands alone (the folded done box) or the question row beneath it already makes its own.
+  const isHeaderAlone = c.phase === 'done' && c.isCollapsed
+  const hasRoomBelowHeader = !isTerminal && c.tasks.length > 0 && !isHeaderAlone && !(c.phase === 'needsYou' && c.replies.length > 0)
   const headerRow = (
-    <Box key="clean-view-header" flexDirection="row" justifyContent="space-between" flexWrap={isTerminal ? 'nowrap' : 'wrap'}>
+    <Box
+      key="clean-view-header"
+      flexDirection="row"
+      justifyContent="space-between"
+      flexWrap={isTerminal ? 'nowrap' : 'wrap'}
+      paddingBottom={hasRoomBelowHeader ? 'md' : undefined}
+    >
       <Box flexGrow={1} flexShrink={1} paddingRight={1}>
         {header}
       </Box>
@@ -174,7 +184,7 @@ export async function drawBox(
       {children}
     </Box>
   )
-  if (c.phase === 'done' && c.isCollapsed) {
+  if (isHeaderAlone) {
     return (
       <Box flexDirection="column">
         {frame([headerRow])}
