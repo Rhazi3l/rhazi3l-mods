@@ -1,6 +1,3 @@
-/** The view in force: `guided` (the checklist and the latest action), or `full` while Clean View is switched off. */
-export type ViewMode = 'guided' | 'full'
-
 export type TaskStatus = 'done' | 'active' | 'upcoming'
 
 export type ChecklistTask = {
@@ -63,6 +60,8 @@ export type Checklist = {
   actions: ChecklistAction[]
   /** Claude's notes between tool calls, newest last, up to the last 100. */
   notes: ChecklistNote[]
+  /** When each step began and ended, by step name, for the time Details shows beside it. */
+  times: Record<string, { start: number; end?: number }>
 }
 
 declare module 'claude-code' {
@@ -74,6 +73,8 @@ declare module 'claude-code' {
       tick: number
       /** What Claude wrote between tool calls this job; the transcript hides it while Clean View is on. */
       narration: string[]
+      /** Whether Details lists finished steps in full while a job runs, which it otherwise folds. */
+      showsAll: boolean
     }
   }
 }

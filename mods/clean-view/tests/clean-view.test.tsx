@@ -3,7 +3,8 @@ import type { Engine } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { PASTEL } from '../hooks/palette'
-import { asksSomething, barSvg, meterCells, plannedTodos, stepWindow } from '../hooks/register'
+import { barSvg, meterCells, stepWindow } from '../hooks/bars'
+import { asksSomething, plannedTodos } from '../hooks/checklist'
 import { cleanName, describeAction, extractQuestion, quickReplies } from '../hooks/text'
 
 const PREFIX = 'mcp__clean-view__'
@@ -153,7 +154,7 @@ describe('checklist', () => {
     }
   })
 
-  test('with no to-do list the Working line carries the latest action and a count', async ($, on) => {
+  test('with no to-do list the Working line carries the latest action', async ($, on) => {
     await startJob($, on)
     for (const surface of SURFACES) {
       const bare = await $.ui.mount({ ...BAND, surface })
@@ -167,7 +168,7 @@ describe('checklist', () => {
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await ui.find({ type: 'Text', text: '✱ Working…' })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /· 📄 colours\.md/ })).toBeDefined()
-      expect(await ui.find({ type: 'Text', text: ' · 2 actions' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /actions/ })).toBeUndefined()
       await ui.unmount()
     }
   })
@@ -257,19 +258,18 @@ describe('checklist', () => {
     expect(await doneRows()).toBe(3)
   })
 
-  test('a to-do list draws done, Working, Next and Up next', async ($, on) => {
+  test('a to-do list draws a done mark, the step in progress and the steps to come', async ($, on) => {
     await startJob($, on)
     await todo($, ['Read your brand notes', 'Build the pricing section', 'Add the contact form', 'Polish the footer'], 1)
 
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
       expect(await ui.find({ type: 'Text', text: /✓/ })).toBeDefined()
-      expect(await ui.find({ type: 'Text', text: 'Working' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /^(Working|Next|Up next)$/ })).toBeUndefined()
       // The header keeps the generic title while it would only repeat the first step's name.
       expect(await ui.find({ type: 'Text', text: '✱ Working on your request' })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: '✱ Read your brand notes' })).toBeUndefined()
-      expect(await ui.find({ type: 'Text', text: /^Next$/ })).toBeDefined()
-      expect(await ui.find({ type: 'Text', text: 'Up next' })).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: /○/ })).toBeDefined()
       expect(await ui.find({ type: 'Text', text: /▶/ })).toBeDefined()
       expect(await ui.find({ key: 'clean-view-style' })).toBeUndefined()
       expect(await ui.find({ key: 'clean-view-frame' })).toMatchObject({ props: { borderStyle: 'round', borderColor: PASTEL.working } })
@@ -282,7 +282,7 @@ describe('checklist', () => {
       } else {
         // The desktop draws each step's bar as an image, centred in its row, in the same colours.
         expect(await ui.find({ type: 'Text', text: /^━/ })).toBeUndefined()
-        expect(await ui.find({ type: 'Svg' })).toMatchObject({ props: { alt: 'Working' } })
+        expect(await ui.find({ type: 'Svg' })).toMatchObject({ props: { alt: 'active' } })
       }
       await ui.unmount()
     }
@@ -331,8 +331,8 @@ describe('checklist', () => {
     await todo($, ['Read your notes', 'Build the page', 'Polish it'], 1)
 
     const ui = await $.ui.mount({ ...BAND, surface: 'terminal' })
-    const labels = await ui.findAll({ type: 'Text', text: /^(Done|Working|Next|Up next|\d+%)$/ })
-    expect(labels.map(label => label.text)).toEqual(['Done', 'Working', 'Next'])
+    const labels = await ui.findAll({ type: 'Text', text: /^(Done|\d+%)$/ })
+    expect(labels.map(label => label.text)).toEqual(['Done'])
     expect(await ui.find({ type: 'Text', text: /Build the page/ })).toMatchObject({ props: { bold: true } })
     await ui.unmount()
   })
@@ -445,6 +445,54 @@ describe('checklist', () => {
     expect(kinds).toEqual(['thinking', 'text', 'text', 'tool'])
   })
 
+  test('a plain write confirmation stays out of Details', async ($, on) => {
+    on('tool.call', { tool: 'Write' }, () => ({ result: 'ok', text: 'File created successfully at: /tmp/a.txt' }) as never)
+    await startJob($, on)
+    await $.tool.call({ tool: 'Write', file_path: '/tmp/a.txt', content: 'hi' })
+    const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    expect(await pane.find({ type: 'Text', text: /\/tmp\/a\.txt/ })).toBeDefined()
+    expect(await pane.find({ type: 'Text', text: /File created successfully/ })).toBeUndefined()
+    await pane.unmount()
+  })
+
+  test('a note that came before a step moved on opens the new step in Details', async ($, on) => {
+    on('turn.step', async function* (_$, e) {
+      const answer = e.index === 0 ? 'Now the second step.' : ''
+      return { turnId: e.turnId, index: e.index, answer, toolUses: e.index === 0 ? [{ id: 'u1', name: 'TodoWrite', input: {} }] : [], stopReason: null } as never
+    })
+    await startJob($, on)
+    await todo($, ['First step', 'Second step'])
+    for await (const _chunk of $.turn.step({ turnId: 't1', index: 0, model: 'm', messageCount: 1 } as never)) void _chunk
+    await todo($, ['First step', 'Second step'], 1)
+    const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    // Filed under the finished first step, which is folded while the job runs, the note would be out of sight.
+    expect(await pane.find({ type: 'Text', text: /Now the second step/ })).toBeUndefined()
+    await pane.unmount()
+    for await (const _chunk of $.turn.step({ turnId: 't1', index: 1, model: 'm', messageCount: 3 } as never)) void _chunk
+    const after = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    expect(await after.find({ type: 'Text', text: /Now the second step/ })).toBeDefined()
+    await after.unmount()
+  })
+
+  test('Show all opens the finished steps while the job runs, and Fold finished closes them again', async ($, on) => {
+    await startJob($, on)
+    await todo($, ['Read your notes', 'Build the site'])
+    await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/brand.md' })
+    await todo($, ['Read your notes', 'Build the site'], 1)
+    const pane = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    expect(await pane.find({ type: 'Text', text: '/tmp/notes/brand.md' })).toBeUndefined()
+    await pane.press({ key: 'clean-view-fold' })
+    expect(await pane.find({ type: 'Text', text: '/tmp/notes/brand.md' })).toBeDefined()
+    await pane.press({ key: 'clean-view-fold' })
+    expect(await pane.find({ type: 'Text', text: '/tmp/notes/brand.md' })).toBeUndefined()
+    await pane.unmount()
+    // Once the job ends everything lists anyway, so the button goes.
+    await $.turn.complete({ turnId: 't1', answer: 'Done.', reason: 'answer' } as never)
+    const whole = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    expect(await whole.find({ key: 'clean-view-fold' })).toBeUndefined()
+    await whole.unmount()
+  })
+
   test('the spinner line is cut to its word once a plan exists, on the terminal only', async ($, on) => {
     const SPINNER = { plugin: 'clean-view', component: 'Spinner', props: { word: 'Fermenting', message: null, suffix: '…', mode: 'responding' } } as const
     on('ui.render', { component: 'Spinner' }, ($, e) => {
@@ -478,7 +526,7 @@ describe('checklist', () => {
     await $.tool.call({ tool: 'Read', file_path: '/tmp/notes/colours.md' })
     for (const surface of SURFACES) {
       const ui = await $.ui.mount({ ...BAND, surface })
-      expect(await ui.find({ key: 'clean-view-trail' })).toMatchObject({ text: expect.stringMatching(/· 📄 colours\.md · 2 actions/) })
+      expect(await ui.find({ key: 'clean-view-trail' })).toMatchObject({ text: expect.stringMatching(/^· 📄 colours\.md$/) })
       expect(await ui.find({ key: 'clean-view-details' })).toBeDefined()
       await ui.unmount()
     }
@@ -515,13 +563,21 @@ describe('checklist', () => {
 
     for (const surface of SURFACES) {
       const pane = await $.ui.mount({ ...PANE, surface })
+      // A finished step folds to its heading, with its action count and time, while the job runs.
       expect(await pane.find({ type: 'Text', text: 'Read your notes' })).toBeDefined()
-      expect(await pane.find({ type: 'Text', text: '/tmp/notes/brand.md' })).toBeDefined()
+      expect(await pane.find({ type: 'Text', text: /1 action · \d+s/ })).toBeDefined()
+      expect(await pane.find({ type: 'Text', text: '/tmp/notes/brand.md' })).toBeUndefined()
       expect(await pane.find({ type: 'Text', text: 'hugo build --minify' })).toBeDefined()
       expect(await pane.find({ type: 'Text', text: 'bash: hugo: command not found' })).toMatchObject({ props: { color: PASTEL.error } })
       expect(await pane.find({ type: 'Text', text: /2 actions · 1 error/ })).toBeDefined()
       await pane.unmount()
     }
+
+    // Once the job ends every step lists in full.
+    await $.turn.complete({ turnId: 't1', answer: 'Done.', reason: 'answer' } as never)
+    const whole = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    expect(await whole.find({ type: 'Text', text: '/tmp/notes/brand.md' })).toBeDefined()
+    await whole.unmount()
 
     const opened = await $.command.run({ command: 'view', args: 'details', ...RUN })
     expect(opened.text).toContain('Details open')
