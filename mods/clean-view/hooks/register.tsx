@@ -630,7 +630,7 @@ export const register: Register = on => {
       )
     }
 
-    // A finished job lists every step, so nothing is folded into "N done".
+    // A finished job lists every step, so nothing is folded into "N earlier steps done".
     const { start: windowStart, end: windowEnd } = c.phase === 'done' ? { start: 0, end: c.tasks.length } : stepWindow(c.tasks)
 
     const nameWidth = Math.max(8, Math.min(MAX_NAME, width - 24))
@@ -703,7 +703,7 @@ export const register: Register = on => {
     // What the window leaves out, in one line: finished steps above it, steps still to come below it.
     const hiddenDone = windowStart
     const hiddenToCome = c.tasks.length - windowEnd
-    const hiddenText = [hiddenDone > 0 ? `✓ ${hiddenDone} done` : '', hiddenToCome > 0 ? `${hiddenToCome} more to come` : '']
+    const hiddenText = [hiddenDone > 0 ? `✓ ${hiddenDone} earlier step${hiddenDone === 1 ? '' : 's'} done` : '', hiddenToCome > 0 ? `${hiddenToCome} more to come` : '']
       .filter(part => part !== '')
       .join(' · ')
     const moreRow = hiddenText === '' ? null : (

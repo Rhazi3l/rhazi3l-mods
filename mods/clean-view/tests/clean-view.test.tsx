@@ -615,7 +615,7 @@ describe('the three-step window', () => {
     expect(await ui.find({ type: 'Text', text: /Three/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /Five/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /Six/ })).toBeUndefined()
-    expect(await ui.find({ type: 'Text', text: '✓ 2 done · 1 more to come' })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: '✓ 2 earlier steps done · 1 more to come' })).toBeDefined()
     await ui.unmount()
   })
 
