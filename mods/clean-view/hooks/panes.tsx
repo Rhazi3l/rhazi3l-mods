@@ -23,6 +23,13 @@ export async function openDetails($: EngineInterface, actionId?: string) {
   return opened
 }
 
+/** The Details button: opens Details, or closes it when it is already open. */
+export async function toggleDetails($: EngineInterface) {
+  const isOpen = (await $.ui.panes()).some(pane => pane.id === DETAILS_PANE)
+  if (isOpen) await $.ui.close({ id: DETAILS_PANE })
+  else await openDetails($)
+}
+
 async function scrollDetails($: EngineInterface, where: { to: 'end' | { key: string }; block?: 'center' }) {
   try {
     await $.ui.scroll({ in: DETAILS_PANE, ...where })

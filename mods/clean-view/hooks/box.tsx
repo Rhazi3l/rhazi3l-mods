@@ -9,7 +9,7 @@ import { PASTEL } from './palette'
 import type { RenderEvent } from './render'
 import { DEFAULT_TITLE } from './state'
 import { MAX_NAME, formatDuration, trimToWidth } from './text'
-import { openDetails } from './panes'
+import { openDetails, toggleDetails } from './panes'
 
 /** Draws the checklist for a job that has started (`startedAt`; `tick` moves the bars), above whatever the engine draws there (`below`). */
 export async function drawBox(
@@ -40,7 +40,7 @@ export async function drawBox(
         key="clean-view-details"
         label="Details"
         hotkey="d"
-        onPress={() => openDetails($)}
+        onPress={() => toggleDetails($)}
       />
     </Box>
   )

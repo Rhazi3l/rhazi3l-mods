@@ -106,28 +106,28 @@ async function refresh($: EngineInterface) {
     // Auto Effort letting go needs no look here: it sets the picker back with /effort, which sets the row.
     if (auto !== lastAuto) {
       lastAuto = auto
-      if (auto !== null) await update($, toolboxInfoAtom, now => (now.effort === auto ? now : { ...now, effort: auto }))
+      if (auto !== null) if ((await read($, toolboxInfoAtom)).effort !== auto) await update($, toolboxInfoAtom, now => ({ ...now, effort: auto }))
     }
   } catch {
     // The next command looks again.
   }
   try {
     const model = await $.session.model()
-    await update($, toolboxInfoAtom, now => (now.model === model ? now : { ...now, model }))
+    if ((await read($, toolboxInfoAtom)).model !== model) await update($, toolboxInfoAtom, now => ({ ...now, model }))
   } catch {
     // No session to read.
   }
   try {
     const advisor = await $.settings.read({ key: 'advisorModel' })
     const next = typeof advisor === 'string' && advisor !== '' ? advisor : null
-    await update($, advisorInfoAtom, now => (now.model === next ? now : { ...now, model: next }))
+    if ((await read($, advisorInfoAtom)).model !== next) await update($, advisorInfoAtom, now => ({ ...now, model: next }))
   } catch {
     // Settings can't be read.
   }
   try {
     const found = (await installedMods($)).map(({ mod, isOn }) => ({ ...mod, isOn }))
     const key = JSON.stringify(found)
-    await update($, modsAtom, now => (JSON.stringify(now) === key ? now : found))
+    if (JSON.stringify(await read($, modsAtom)) !== key) await update($, modsAtom, () => found)
   } catch {
     // The next command looks again.
   }
@@ -202,7 +202,7 @@ export const register: Register = on => {
         const level = e.args.trim().toLowerCase().replace(/[^a-z]/g, '')
         const named = level === 'extrahigh' ? 'xhigh' : level
         if ((EFFORTS as readonly string[]).includes(named)) {
-          await update($, toolboxInfoAtom, now => (now.effort === named ? now : { ...now, effort: named }))
+          if ((await read($, toolboxInfoAtom)).effort !== named) await update($, toolboxInfoAtom, now => ({ ...now, effort: named }))
         }
       }
       if (await read($, toolboxOpenAtom)) await refresh($)
