@@ -10,6 +10,8 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { UpgradeFlow } from '../types'
 import { PASTEL } from './palette'
+import { publishMod } from './registry'
+import type { ModEntry } from './registry'
 import { buildRequest, countWords, fillPlaceholders, findPlaceholders, isTooShort, isUnchanged, parseUpgrade, plural } from './text'
 
 const PANE = 'prompt-upgrade'
@@ -21,6 +23,12 @@ const IDLE: UpgradeFlow = { phase: 'idle', original: '', upgraded: '', added: []
 
 // Whether the footer button shows. The toolbox switches it; `/better <prompt>` works either way.
 const isOnAtom = atom({ plugin: 'prompt-upgrade', key: 'isOn' } as const, true)
+const ENTRY: ModEntry = {
+  id: 'prompt-upgrade',
+  name: 'Better',
+  command: 'better',
+  description: 'A ✦ Better button beside Info that rewrites the prompt you typed; nothing is sent until you press Run it',
+}
 const flowAtom = atom({ plugin: 'prompt-upgrade', key: 'flow' } as const, IDLE)
 
 const TOO_SHORT = 'Already short, so there is nothing to upgrade. Send it as it is.'
@@ -97,14 +105,18 @@ async function restoreAfterClear($: EngineInterface) {
   const { value } = await $.state.get({ plugin: 'prompt-upgrade', key: 'isOn' } as const)
   if (value !== undefined) return
   const saved = await $.store.get(STORE_ON)
-  await update($, isOnAtom, () => (typeof saved === 'boolean' ? saved : true))
+  const isOn = typeof saved === 'boolean' ? saved : true
+  await update($, isOnAtom, () => isOn)
+  await publishMod($, ENTRY, isOn)
 }
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const saved = await $.store.get(STORE_ON)
     // Written even when unchanged, so the toolbox can tell Prompt Upgrade is installed.
-    await update($, isOnAtom, () => (typeof saved === 'boolean' ? saved : true))
+    const isOn = typeof saved === 'boolean' ? saved : true
+    await update($, isOnAtom, () => isOn)
+    await publishMod($, ENTRY, isOn)
     try {
       await $.command.register({
         name: 'better',
@@ -135,6 +147,7 @@ export const register: Register = on => {
       const turnsOn = args.toLowerCase() === 'on'
       await update($, isOnAtom, () => turnsOn)
       await $.store.set(STORE_ON, turnsOn)
+      await publishMod($, ENTRY, turnsOn)
       return { text: `The Better button is ${turnsOn ? 'on' : 'off'}.` }
     }
     if (args === '') return { text: USAGE }

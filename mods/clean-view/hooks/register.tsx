@@ -20,6 +20,8 @@ import {
 import { COMMANDS } from './info'
 import { drawDetails, followDetails, keepInView, noteScroll } from './panes'
 import { PASTEL } from './palette'
+import { publishMod } from './registry'
+import type { ModEntry } from './registry'
 import {
   DEFAULT_TITLE, DETAILS_PANE, EMPTY, REASON_PERMISSION, REASON_QUESTION, REASON_REPLY, STORE_ALERTS, STORE_ON,
   STUCK_FAILING, STUCK_REFUSAL, STUCK_REFUSED,
@@ -29,6 +31,12 @@ import { apiErrorSentence, cleanName, describeAction, describeFull, firstLine, i
 // Values the drawings read (types/index.d.ts). `isOn` is saved in $.store too, so it lasts past the session;
 // the toolbox reads it. They are declared here because the engine reads and writes them from this file only.
 const isOnAtom = atom({ plugin: 'clean-view', key: 'isOn' } as const, true)
+const ENTRY: ModEntry = {
+  id: 'clean-view',
+  name: 'Clean View',
+  command: 'view',
+  description: 'A plain-English checklist above the prompt; Details shows every step and action',
+}
 const checklistAtom = atom({ plugin: 'clean-view', key: 'checklist' } as const, EMPTY)
 const tickAtom = atom({ plugin: 'clean-view', key: 'tick' } as const, 0)
 const narrationAtom = atom({ plugin: 'clean-view', key: 'narration' } as const, [] as string[])
@@ -87,14 +95,18 @@ async function restoreAfterClear($: EngineInterface) {
   const { value } = await $.state.get({ plugin: 'clean-view', key: 'isOn' } as const)
   if (value !== undefined) return
   const savedOn = await $.store.get(STORE_ON)
-  await update($, isOnAtom, () => (typeof savedOn === 'boolean' ? savedOn : true))
+  const isOn = typeof savedOn === 'boolean' ? savedOn : true
+  await update($, isOnAtom, () => isOn)
+  await publishMod($, ENTRY, isOn)
 }
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const savedOn = await $.store.get(STORE_ON)
     // Written even when unchanged, so other mods can tell Clean View is installed.
-    await update($, isOnAtom, () => (typeof savedOn === 'boolean' ? savedOn : true))
+    const isOn = typeof savedOn === 'boolean' ? savedOn : true
+    await update($, isOnAtom, () => isOn)
+    await publishMod($, ENTRY, isOn)
     try {
       for (const command of COMMANDS) await $.command.register(command)
     } catch {
@@ -114,6 +126,7 @@ export const register: Register = on => {
       const isOn = arg === 'on'
       await update($, isOnAtom, () => isOn)
       await $.store.set(STORE_ON, isOn)
+      await publishMod($, ENTRY, isOn)
       return { text: isOn ? 'Clean View is on.' : 'Clean View is off. Everything Claude does is shown in full.' }
     }
     return { text: 'Use /view on, /view off or /view alerts on|off.' }

@@ -9,6 +9,8 @@ import type { EngineInterface, Register } from 'claude-code'
 
 import type { DeskbarChat, DeskbarUsage } from '../types'
 import { PASTEL } from './palette'
+import { publishMod } from './registry'
+import type { ModEntry } from './registry'
 import { barCells, cacheLeftMs, formatTokens, levelColor, planName, untilTime } from './text'
 
 const EMPTY_USAGE: DeskbarUsage = { contextPercent: null, windows: [] }
@@ -20,6 +22,12 @@ const EMPTY_CHAT: DeskbarChat = {
 }
 
 const isOnAtom = atom({ plugin: 'deskbar', key: 'isOn' } as const, true)
+const ENTRY: ModEntry = {
+  id: 'deskbar',
+  name: 'Deskbar',
+  command: 'deskbar',
+  description: 'A band above the prompt in the desktop app with the plan, context, 5h and weekly usage and prompt cache',
+}
 const usageAtom = atom({ plugin: 'deskbar', key: 'usage' } as const, EMPTY_USAGE)
 const chatAtom = atom({ plugin: 'deskbar', key: 'chat' } as const, EMPTY_CHAT)
 // Counts up each minute, so the cache time redraws.
@@ -86,14 +94,18 @@ async function restoreAfterClear($: EngineInterface) {
   const { value } = await $.state.get({ plugin: 'deskbar', key: 'isOn' } as const)
   if (value !== undefined) return
   const saved = await $.store.get(STORE_ON)
-  await update($, isOnAtom, () => (typeof saved === 'boolean' ? saved : true))
+  const isOn = typeof saved === 'boolean' ? saved : true
+  await update($, isOnAtom, () => isOn)
+  await publishMod($, ENTRY, isOn)
 }
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const saved = await $.store.get(STORE_ON)
     // Written even when unchanged, so the toolbox can tell Deskbar is installed.
-    await update($, isOnAtom, () => (typeof saved === 'boolean' ? saved : true))
+    const isOn = typeof saved === 'boolean' ? saved : true
+    await update($, isOnAtom, () => isOn)
+    await publishMod($, ENTRY, isOn)
     try {
       await $.command.register({
         name: 'deskbar',
@@ -134,6 +146,7 @@ export const register: Register = on => {
     const turnsOn = args === '' ? !(await read($, isOnAtom)) : args === 'on'
     await update($, isOnAtom, () => turnsOn)
     await $.store.set(STORE_ON, turnsOn)
+    await publishMod($, ENTRY, turnsOn)
     return { text: `Deskbar is ${turnsOn ? 'on' : 'off'}.` }
   })
 

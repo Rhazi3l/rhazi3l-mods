@@ -50,18 +50,35 @@ async function startSession($: Engine, on: On) {
   return ran
 }
 
-/** Stands in for sibling mods: each one's on/off value and command; registered before the session starts. */
-function fakeMod(on: On, ran: string[], mods: readonly { id: string; command: string }[] = [{ id: 'clean-view', command: 'view' }]) {
-  const values = new Map(mods.map(mod => [mod.id, { isOn: true, version: 1 }]))
-  on('state.get', ($, e, next) => {
-    const held = e.key === 'isOn' ? values.get(e.plugin) : undefined
-    return held ? ({ value: { value: held.isOn, version: held.version } } as never) : next(e)
+type FakeMod = { id: string; name: string; command: string }
+const CLEAN_VIEW = { id: 'clean-view', name: 'Clean View', command: 'view' }
+const BETTER = { id: 'prompt-upgrade', name: 'Better', command: 'better' }
+const DESKBAR = { id: 'deskbar', name: 'Deskbar', command: 'deskbar' }
+
+/**
+ * Stands in for sibling mods: each one's switchboard file and command, registered before the session starts.
+ * `removed` mods left a file behind but are no longer in the installed-plugins list.
+ */
+function fakeMod(on: On, ran: string[], mods: readonly FakeMod[] = [CLEAN_VIEW], removed: readonly FakeMod[] = []) {
+  const values = new Map([...mods, ...removed].map(mod => [mod.id, { ...mod, isOn: true }]))
+  const installed = JSON.stringify({ plugins: Object.fromEntries(mods.map(mod => [`${mod.id}@rhazi3l-mods`, []])) })
+  on('fs.exists', ($, e, next) => (e.path.endsWith('/mods-registry') ? ({ value: true } as never) : next(e)))
+  on('fs.list', ($, e, next) =>
+    e.path.endsWith('/mods-registry')
+      ? ({ value: [...values.keys()].map(id => ({ name: `${id}.json`, kind: 'file', size: 1, mtimeMs: 0, isLink: false })) } as never)
+      : next(e),
+  )
+  on('fs.read', ($, e, next) => {
+    if (e.path.endsWith('/installed_plugins.json')) return { value: installed } as never
+    const id = /\/mods-registry\/(.+)\.json$/.exec(e.path)?.[1]
+    const held = id ? values.get(id) : undefined
+    return held ? ({ value: JSON.stringify({ id, name: held.name, command: held.command, description: '', isOn: held.isOn }) } as never) : next(e)
   })
   for (const { id, command } of mods) {
     on('command.run', { command }, ($, e) => {
       ran.push(`${command} ${e.args}`)
       const held = values.get(id)
-      if (held) values.set(id, { isOn: e.args === 'on', version: held.version + 1 })
+      if (held) values.set(id, { ...held, isOn: e.args === 'on' })
       return { text: 'ok' }
     })
   }
@@ -277,10 +294,7 @@ describe('toolbox', () => {
 
   test('with Better installed too, it gets its own button that runs /better off', async ($, on) => {
     const ran: string[] = []
-    fakeMod(on, ran, [
-      { id: 'clean-view', command: 'view' },
-      { id: 'prompt-upgrade', command: 'better' },
-    ])
+    fakeMod(on, ran, [CLEAN_VIEW, BETTER])
     on('ui.toast', () => ({ value: undefined }) as never)
     await startSession($, on)
     await $.command.run({ command: 'toolbox', args: '', ...RUN })
@@ -298,7 +312,7 @@ describe('toolbox', () => {
 
   test('with Deskbar installed, its button runs /deskbar off', async ($, on) => {
     const ran: string[] = []
-    fakeMod(on, ran, [{ id: 'deskbar', command: 'deskbar' }])
+    fakeMod(on, ran, [DESKBAR])
     on('ui.toast', () => ({ value: undefined }) as never)
     await startSession($, on)
     await $.command.run({ command: 'toolbox', args: '', ...RUN })
@@ -314,18 +328,21 @@ describe('toolbox', () => {
     await band.unmount()
   })
 
-  test('a mod whose state can\'t be read does not take the Mods row down with it', async ($, on) => {
-    // Clean View answers; Deskbar is not installed, so reading its value is refused.
-    on('state.get', ($, e, next) => {
-      if (e.plugin === 'deskbar') return { deny: 'no such plugin' } as never
-      return e.plugin === 'clean-view' && e.key === 'isOn' ? ({ value: { value: true, version: 1 } } as never) : next(e)
-    })
+  test('a mod nobody told the toolbox about appears by itself, and a removed one goes', async ($, on) => {
+    const ran: string[] = []
+    const effort = { id: 'effort-auto', name: 'Auto Effort', command: 'effort-auto' }
+    fakeMod(on, ran, [CLEAN_VIEW, effort], [DESKBAR])
+    on('ui.toast', () => ({ value: undefined }) as never)
     await startSession($, on)
     await $.command.run({ command: 'toolbox', args: '', ...RUN })
     const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
     expect(await band.find({ key: 'toolbox-panel' })).toBeDefined()
     expect(await band.find({ key: 'mod-clean-view' })).toMatchObject({ text: '● Clean View' })
+    expect(await band.find({ key: 'mod-effort-auto' })).toMatchObject({ text: '● Auto Effort' })
+    // Deskbar left its file behind but is no longer installed.
     expect(await band.find({ key: 'mod-deskbar' })).toBeUndefined()
+    await band.press({ key: 'mod-effort-auto' })
+    expect(ran).toEqual(['effort-auto off'])
     await band.unmount()
   })
 })

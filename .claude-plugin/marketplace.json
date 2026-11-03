@@ -24,6 +24,11 @@
       "name": "deskbar",
       "source": "./mods/deskbar",
       "description": "A band above the prompt in the desktop app with the plan, context, 5h and weekly usage and prompt cache, like the terminal status line."
+    },
+    {
+      "name": "effort-auto",
+      "source": "./mods/effort-auto",
+      "description": "Reads each prompt and sets the effort level it needs, by itself. Just on or off, from the toolbox or /effort-auto."
     }
   ]
 }

@@ -10,6 +10,7 @@ import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
 import type { AdvisorInfo, ToolboxInfo } from '../types'
 import { PASTEL } from './palette'
+import type { ModEntry } from './registry'
 import { ADVISORS, EFFORTS, MODELS, capitalise, contextColor, modelAlias, prettyModel } from './text'
 
 const toolboxOpenAtom = atom({ plugin: 'toolbox', key: 'toolboxOpen' } as const, false)
@@ -22,46 +23,39 @@ const advisorInfoAtom = atom({ plugin: 'toolbox', key: 'advisorInfo' } as const,
 const contextAtom = atom({ plugin: 'toolbox', key: 'contextPercent' } as const, null as number | null)
 
 const LABEL_WIDTH = 8
-/** A sibling mod the toolbox can switch: it owns its on/off value and a command that takes `on` and `off`. */
-type SiblingMod = { id: string; name: string; command: string; description: string }
+/** A mod the toolbox can switch: it has an on/off and a slash command that takes `on` and `off`. */
+type SiblingMod = ModEntry
 
-const CLEAN_VIEW: SiblingMod = {
-  id: 'clean-view',
-  name: 'Clean View',
-  command: 'view',
-  description: 'A plain-English checklist above the prompt; Details shows every step and action',
-}
-
-const PROMPT_UPGRADE: SiblingMod = {
-  id: 'prompt-upgrade',
-  name: 'Better',
-  command: 'better',
-  description: 'A ✦ Better button beside Info that rewrites the prompt you typed; nothing is sent until you press Run it',
-}
-
-const DESKBAR: SiblingMod = {
-  id: 'deskbar',
-  name: 'Deskbar',
-  command: 'deskbar',
-  description: 'A band above the prompt in the desktop app with the plan, context, 5h and weekly usage and prompt cache',
-}
-
-/** Each sibling mod with its on/off, or undefined while it isn't installed. */
-async function siblingStates($: EngineInterface): Promise<{ mod: SiblingMod; isOn: boolean | undefined }[]> {
-  // Each mod writes its own value; the toolbox only reads them. A mod that isn't installed answers
-  // nothing, or refuses the read; either way it is left out and the others still show.
-  const cleanViewOn = await $.state.get({ plugin: 'clean-view', key: 'isOn' } as const).then(read => read.value, () => undefined)
-  const promptUpgradeOn = await $.state.get({ plugin: 'prompt-upgrade', key: 'isOn' } as const).then(read => read.value, () => undefined)
-  const deskbarOn = await $.state.get({ plugin: 'deskbar', key: 'isOn' } as const).then(read => read.value, () => undefined)
-  return [
-    { mod: CLEAN_VIEW, isOn: cleanViewOn },
-    { mod: PROMPT_UPGRADE, isOn: promptUpgradeOn },
-    { mod: DESKBAR, isOn: deskbarOn },
-  ]
-}
-
-async function installedMods($: EngineInterface) {
-  return (await siblingStates($)).filter((s): s is { mod: SiblingMod; isOn: boolean } => s.isOn !== undefined)
+/**
+ * Every installed mod that has published an on/off. Each such mod writes a file to the mods' switchboard
+ * (registry.ts), so a mod appears here when it is installed and goes when it is removed, with nothing
+ * added to or taken out of the toolbox. The installed-plugins list is the check that a file left behind
+ * by a removed mod is not shown.
+ */
+async function installedMods($: EngineInterface): Promise<{ mod: SiblingMod; isOn: boolean }[]> {
+  try {
+    const dotClaude = `${$.plugin.root.split('/.claude/')[0] ?? ''}/.claude`
+    const dir = `${dotClaude}/mods-registry`
+    if (!(await $.fs.exists(dir))) return []
+    const installed = JSON.parse(String(await $.fs.read(`${dotClaude}/plugins/installed_plugins.json`))) as { plugins?: Record<string, unknown> }
+    const names = new Set(Object.keys(installed.plugins ?? {}).map(key => key.split('@')[0]))
+    const found: { mod: SiblingMod; isOn: boolean }[] = []
+    for (const file of await $.fs.list(dir)) {
+      if (file.kind !== 'file' || !file.name.endsWith('.json')) continue
+      try {
+        const entry = JSON.parse(String(await $.fs.read(`${dir}/${file.name}`))) as Partial<ModEntry> & { isOn?: unknown }
+        const { id, name, command, description } = entry
+        if (typeof id !== 'string' || typeof name !== 'string' || typeof command !== 'string' || typeof entry.isOn !== 'boolean') continue
+        if (id === 'toolbox' || !names.has(id)) continue
+        found.push({ mod: { id, name, command, description: typeof description === 'string' ? description : '' }, isOn: entry.isOn })
+      } catch {
+        // One unreadable file leaves out that mod only.
+      }
+    }
+    return found.sort((x, y) => x.mod.name.localeCompare(y.mod.name))
+  } catch {
+    return []
+  }
 }
 
 /** Runs the mod's own command, so the mod keeps its value and saves it. */

@@ -20,20 +20,5 @@ declare module 'claude-code' {
       /** How full the context window is, 0 to 100; null before a measurement. */
       contextPercent: number | null
     }
-    /**
-     * Read only: owned and written by the Clean View mod. Undefined means it
-     * isn't installed (or hasn't started), so the toolbox shows no button for it.
-     */
-    'clean-view': {
-      isOn: boolean
-    }
-    /** Read only, as above: owned and written by the Prompt Upgrade mod. */
-    'prompt-upgrade': {
-      isOn: boolean
-    }
-    /** Read only, as above: owned and written by the Deskbar mod. */
-    deskbar: {
-      isOn: boolean
-    }
   }
 }
