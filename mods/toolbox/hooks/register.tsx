@@ -88,8 +88,24 @@ async function readAdvisor($: EngineInterface) {
   }
 }
 
+/** The level Auto Effort last held, as the toolbox saw it, so only a change by Auto Effort moves the Effort row. */
+let lastAuto: string | null = null
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
+    // Auto Effort picks in the middle of a turn, and the panel only redraws when a value changes, so while
+    // the panel is open its level is looked at again every second.
+    $.clock.every(1000, async () => {
+      try {
+        if (!(await read($, toolboxOpenAtom))) return
+        const auto = await autoEffort($)
+        if (auto === lastAuto) return
+        lastAuto = auto
+        await update($, toolboxInfoAtom, now => (auto === null || now.effort === auto ? now : { ...now, effort: auto }))
+      } catch {
+        // The next second looks again.
+      }
+    })
     try {
       await $.command.register({
         name: 'toolbox',
