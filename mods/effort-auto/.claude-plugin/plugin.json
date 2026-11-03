@@ -1,6 +1,6 @@
 {
   "name": "effort-auto",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Picks the effort level each prompt needs and sets it for you. On or off, from the toolbox or /effort-auto.",
   "author": {
     "name": "Rhazi3l"
