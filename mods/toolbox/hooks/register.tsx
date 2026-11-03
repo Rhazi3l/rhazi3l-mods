@@ -91,33 +91,25 @@ async function readAdvisor($: EngineInterface) {
   }
 }
 
-/** What the last look at the live values saw, so only a real change moves the rows. */
-let lastSeen = ''
+/** The level Auto Effort held when the panel last looked, so only a change by Auto Effort moves the Effort row. */
+let lastAuto: string | null = null
 
 /**
- * Looks at everything the panel shows and updates what changed: the level Auto Effort holds or the saved
- * effort setting, the session's model, the advisor and the mods' on/off. The panel only redraws when a
- * value changes, so this runs when it opens and every second while it is open.
+ * Looks at what the panel shows that no event of its own announces: the level Auto Effort holds, the
+ * session's model, the advisor and the mods' on/off. Runs when the panel opens and after every command
+ * (a command is what changes any of them). Each update writes only on a real change, so nothing redraws
+ * needlessly.
  */
 async function refresh($: EngineInterface) {
   try {
     const auto = await autoEffort($)
-    let saved: unknown = null
-    try {
-      saved = (await $.settings.read()).effortLevel
-    } catch {
-      // Settings can't be read (a headless host).
-    }
-    // Auto Effort's level when it holds one, else the picker's saved level. A change of either moves the
-    // row; between changes the row keeps what the last request really went out with.
-    const seen = `${auto}|${String(saved)}`
-    if (seen !== lastSeen) {
-      lastSeen = seen
-      const shown = auto ?? (typeof saved === 'string' ? saved : null)
-      if (shown !== null) await update($, toolboxInfoAtom, now => (now.effort === shown ? now : { ...now, effort: shown }))
+    // Auto Effort letting go needs no look here: it sets the picker back with /effort, which sets the row.
+    if (auto !== lastAuto) {
+      lastAuto = auto
+      if (auto !== null) await update($, toolboxInfoAtom, now => (now.effort === auto ? now : { ...now, effort: auto }))
     }
   } catch {
-    // The next second looks again.
+    // The next command looks again.
   }
   try {
     const model = await $.session.model()
@@ -137,7 +129,7 @@ async function refresh($: EngineInterface) {
     const key = JSON.stringify(found)
     await update($, modsAtom, now => (JSON.stringify(now) === key ? now : found))
   } catch {
-    // The next second looks again.
+    // The next command looks again.
   }
 }
 
@@ -149,9 +141,6 @@ async function toggle($: EngineInterface): Promise<boolean> {
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    $.clock.every(1000, async () => {
-      if (await read($, toolboxOpenAtom).catch(() => false)) await refresh($)
-    })
     try {
       await $.command.register({
         name: 'toolbox',
@@ -199,6 +188,27 @@ export const register: Register = on => {
     await track()
     const result = yield* next(e)
     await track().catch(() => undefined)
+    return result
+  })
+
+  // Any command can change what the panel shows (/effort, /model, /advisor, a mod's on and off, the
+  // mod's own reset of the picker), so after each one the panel looks again. A command that sets the effort
+  // is read from its own words: the saved settings may not have caught up yet.
+  on('command.run', async ($, e, next) => {
+    const result = await next(e)
+    if (e.command === 'toolbox') return result
+    try {
+      if (e.command === 'effort') {
+        const level = e.args.trim().toLowerCase().replace(/[^a-z]/g, '')
+        const named = level === 'extrahigh' ? 'xhigh' : level
+        if ((EFFORTS as readonly string[]).includes(named)) {
+          await update($, toolboxInfoAtom, now => (now.effort === named ? now : { ...now, effort: named }))
+        }
+      }
+      if (await read($, toolboxOpenAtom)) await refresh($)
+    } catch {
+      // The panel keeps what it showed.
+    }
     return result
   })
 

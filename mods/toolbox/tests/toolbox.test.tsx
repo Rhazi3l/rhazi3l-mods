@@ -363,4 +363,17 @@ describe('toolbox', () => {
     expect(await band.find({ key: 'effort-medium' })).toMatchObject({ props: { variant: 'secondary' } })
     await band.unmount()
   })
+
+  test('a command that sets the effort moves the Effort row at once, with the panel open', async ($, on) => {
+    await startSession($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
+    await $.command.run({ command: 'effort', args: 'low', ...RUN })
+    const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await band.find({ key: 'effort-low' })).toMatchObject({ props: { variant: 'primary' } })
+    await $.command.run({ command: 'effort', args: 'extra high', ...RUN })
+    const again = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await again.find({ key: 'effort-xhigh' })).toMatchObject({ props: { variant: 'primary' } })
+    await band.unmount()
+    await again.unmount()
+  })
 })
