@@ -43,20 +43,20 @@ function asLevel(value: unknown): Level | null {
 }
 
 function pickPrompt(text: string, lastReply: string, now: string) {
-  return `You pick the effort level an AI assistant (Claude) should use for one prompt. Effort sets how much time, reading and checking Claude spends, and how many decisions it makes alone. It is not how smart Claude is.
+  return `You pick the effort level Claude Code should use for one prompt from a person working in a terminal, mostly on software. Effort is how much work Claude does on the request: how many files it reads, how much it verifies and tests, and how much it decides alone before checking in. It is not how smart Claude is, and it cannot fix a missing piece of context or a wrong approach.
 
-Ask these four questions in this order and stop at the first yes:
+The levels, from Anthropic's own guidance on effort:
+- low: quick answers while the person stays in the loop. Brainstorming, sketching, easy or small changes, explaining or reading code, simple questions, looking something up, git and housekeeping.
+- medium: the default, for most regular work. Implementing a feature, a normal edit or refactor, writing tests or docs, an ordinary fix, typical questions about the project.
+- high: work where verification matters or there are hidden edge cases. Fixing a bug in an existing codebase, reviewing code or a change for risk, security-sensitive code, data or migration work, anything where a quiet mistake is costly, and checking or testing work made at a lower level.
+- xhigh: a long, hard job the person hands over and walks away from, where Claude must reproduce, test and check its own work with nobody to ask.
+- max: only when the prompt asks for fully autonomous, end-to-end work on a hard problem, such as building and verifying a whole app or hunting for security flaws in critical software.
 
-1. Will the person go back and forth with Claude on this, or is it a simple task? Then low.
-   Examples: brainstorming options, quick rewrites, sorting or tagging items, short summaries, rough drafts or outlines, small tweaks to something already made, simple questions.
-2. Would a hidden mistake cost money, a client, trust or a wrong decision? Then high.
-   Examples: checking numbers across sources, open-ended analysis with no set path, reviewing a contract for risk, fact-checking, going through long documents, verifying and testing work made at a lower level, building or fixing a skill.
-3. Is the person handing off a long, hard and critical job and walking away, with no time to answer questions? All three must be true. Then xhigh.
-   Examples: a full research report from a year of calls and tickets, reviewing a 50 page agreement before signing, an investor pitch deck as the best one shot. Answer max only when the prompt asks for the deepest possible work and says it is critical; otherwise xhigh.
-4. Everything else is medium: everyday writing, repurposing content, meeting summaries, standard reports in a set format, quick research before a call. If you are not sure, medium.
-
-A task being long does not make it high. Rule-following work stays low or medium.
-If the prompt only approves, answers a question, or says to go on with earlier work (yes, go, ok, do it, option 2), answer keep.
+How to choose:
+1. Start from medium. Move down only when the work is clearly quick, small or conversational. Move up only for a reason from the list above.
+2. A long or detailed prompt does not make it harder. A short prompt can still need high (a bug with edge cases).
+3. xhigh and max are rare. If you are unsure between two levels, pick the lower one.
+4. If the prompt only approves, answers a question Claude asked, or says to go on (yes, go, ok, do it, option 2), answer keep.
 
 The chat runs at: ${now || 'unknown'}
 

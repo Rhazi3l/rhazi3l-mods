@@ -376,4 +376,18 @@ describe('toolbox', () => {
     await band.unmount()
     await again.unmount()
   })
+
+  test('a typed /advisor moves the Advisor row at once, with the panel open', async ($, on) => {
+    fakeChat(on, [])
+    await startSession($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
+    await $.command.run({ command: 'advisor', args: 'opus', ...RUN })
+    const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await band.find({ key: 'advisor-opus' })).toMatchObject({ props: { variant: 'primary' } })
+    await $.command.run({ command: 'advisor', args: 'off', ...RUN })
+    const off = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await off.find({ key: 'advisor-off' })).toMatchObject({ props: { variant: 'primary' } })
+    await band.unmount()
+    await off.unmount()
+  })
 })

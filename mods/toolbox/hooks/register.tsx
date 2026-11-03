@@ -118,13 +118,6 @@ async function refresh($: EngineInterface) {
     // No session to read.
   }
   try {
-    const advisor = await $.settings.read({ key: 'advisorModel' })
-    const next = typeof advisor === 'string' && advisor !== '' ? advisor : null
-    if ((await read($, advisorInfoAtom)).model !== next) await update($, advisorInfoAtom, now => ({ ...now, model: next }))
-  } catch {
-    // Settings can't be read.
-  }
-  try {
     const found = (await installedMods($)).map(({ mod, isOn }) => ({ ...mod, isOn }))
     const key = JSON.stringify(found)
     if (JSON.stringify(await read($, modsAtom)) !== key) await update($, modsAtom, () => found)
@@ -203,6 +196,14 @@ export const register: Register = on => {
         const named = level === 'extrahigh' ? 'xhigh' : level
         if ((EFFORTS as readonly string[]).includes(named)) {
           if ((await read($, toolboxInfoAtom)).effort !== named) await update($, toolboxInfoAtom, now => ({ ...now, effort: named }))
+        }
+      }
+      // /advisor X: read from its own words too, for the same reason as /effort.
+      if (e.command === 'advisor') {
+        const choice = e.args.trim().toLowerCase()
+        if (choice !== '') {
+          const model = ['off', 'none', 'unset'].includes(choice) ? null : choice
+          if ((await read($, advisorInfoAtom)).model !== model) await update($, advisorInfoAtom, now => ({ ...now, model }))
         }
       }
       // Auto Effort let go: the requests are back at the picker's level, so the row shows that level.
