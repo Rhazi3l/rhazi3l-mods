@@ -10,6 +10,15 @@ export type AdvisorInfo = {
   model: string | null
 }
 
+/** A mod listed in the panel: what it published, and whether it is on. */
+export type ToolboxMod = {
+  id: string
+  name: string
+  command: string
+  description: string
+  isOn: boolean
+}
+
 declare module 'claude-code' {
   interface PluginState {
     toolbox: {
@@ -19,6 +28,8 @@ declare module 'claude-code' {
       advisorInfo: AdvisorInfo
       /** How full the context window is, 0 to 100; null before a measurement. */
       contextPercent: number | null
+      /** The installed mods that published an on/off, as last looked at. */
+      mods: ToolboxMod[]
     }
   }
 }

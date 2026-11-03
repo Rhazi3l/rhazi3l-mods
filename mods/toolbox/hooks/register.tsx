@@ -8,7 +8,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
-import type { AdvisorInfo, ToolboxInfo } from '../types'
+import type { AdvisorInfo, ToolboxInfo, ToolboxMod } from '../types'
 import { PASTEL } from './palette'
 import type { ModEntry } from './registry'
 import { ADVISORS, EFFORTS, MODELS, capitalise, contextColor, modelAlias, prettyModel } from './text'
@@ -19,6 +19,9 @@ const toolboxInfoAtom = atom({ plugin: 'toolbox', key: 'toolboxInfo' } as const,
 
 const EMPTY_ADVISOR: AdvisorInfo = { model: null }
 const advisorInfoAtom = atom({ plugin: 'toolbox', key: 'advisorInfo' } as const, EMPTY_ADVISOR)
+
+const EMPTY_MODS: ToolboxMod[] = []
+const modsAtom = atom({ plugin: 'toolbox', key: 'mods' } as const, EMPTY_MODS)
 
 const contextAtom = atom({ plugin: 'toolbox', key: 'contextPercent' } as const, null as number | null)
 
@@ -88,26 +91,66 @@ async function readAdvisor($: EngineInterface) {
   }
 }
 
-/** The level Auto Effort last held, as the toolbox saw it, so only a change by Auto Effort moves the Effort row. */
-let lastAuto: string | null = null
+/** What the last look at the live values saw, so only a real change moves the rows. */
+let lastSeen = ''
+
+/**
+ * Looks at everything the panel shows and updates what changed: the level Auto Effort holds or the saved
+ * effort setting, the session's model, the advisor and the mods' on/off. The panel only redraws when a
+ * value changes, so this runs when it opens and every second while it is open.
+ */
+async function refresh($: EngineInterface) {
+  try {
+    const auto = await autoEffort($)
+    let saved: unknown = null
+    try {
+      saved = (await $.settings.read()).effortLevel
+    } catch {
+      // Settings can't be read (a headless host).
+    }
+    // Auto Effort's level when it holds one, else the picker's saved level. A change of either moves the
+    // row; between changes the row keeps what the last request really went out with.
+    const seen = `${auto}|${String(saved)}`
+    if (seen !== lastSeen) {
+      lastSeen = seen
+      const shown = auto ?? (typeof saved === 'string' ? saved : null)
+      if (shown !== null) await update($, toolboxInfoAtom, now => (now.effort === shown ? now : { ...now, effort: shown }))
+    }
+  } catch {
+    // The next second looks again.
+  }
+  try {
+    const model = await $.session.model()
+    await update($, toolboxInfoAtom, now => (now.model === model ? now : { ...now, model }))
+  } catch {
+    // No session to read.
+  }
+  try {
+    const advisor = await $.settings.read({ key: 'advisorModel' })
+    const next = typeof advisor === 'string' && advisor !== '' ? advisor : null
+    await update($, advisorInfoAtom, now => (now.model === next ? now : { ...now, model: next }))
+  } catch {
+    // Settings can't be read.
+  }
+  try {
+    const found = (await installedMods($)).map(({ mod, isOn }) => ({ ...mod, isOn }))
+    const key = JSON.stringify(found)
+    await update($, modsAtom, now => (JSON.stringify(now) === key ? now : found))
+  } catch {
+    // The next second looks again.
+  }
+}
+
+/** Opens or closes the panel; opening looks at everything first, so it never shows old values. */
+async function toggle($: EngineInterface): Promise<boolean> {
+  if (!(await read($, toolboxOpenAtom))) await refresh($)
+  return update($, toolboxOpenAtom, open => !open)
+}
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
-    // Auto Effort picks in the middle of a turn, and the panel only redraws when a value changes, so while
-    // the panel is open its level is looked at again every second.
     $.clock.every(1000, async () => {
-      try {
-        if (!(await read($, toolboxOpenAtom))) return
-        const auto = await autoEffort($)
-        if (auto === lastAuto) return
-        lastAuto = auto
-        // Auto Effort let go (turned off, or the picker moved): the row goes back to the picker's own level.
-        const saved = auto === null ? (await $.settings.read()).effortLevel : null
-        const shown = auto ?? (typeof saved === 'string' ? saved : null)
-        if (shown !== null) await update($, toolboxInfoAtom, now => (now.effort === shown ? now : { ...now, effort: shown }))
-      } catch {
-        // The next second looks again.
-      }
+      if (await read($, toolboxOpenAtom).catch(() => false)) await refresh($)
     })
     try {
       await $.command.register({
@@ -166,7 +209,7 @@ export const register: Register = on => {
   })
 
   on('command.run', { command: 'toolbox' }, async $ => {
-    const isOpen = await update($, toolboxOpenAtom, open => !open)
+    const isOpen = await toggle($)
     return { text: isOpen ? 'Info open above the prompt.' : 'Info closed.' }
   })
 
@@ -190,7 +233,7 @@ export const register: Register = on => {
           <Button
             key="toolbox"
             plain
-            onPress={() => update($, toolboxOpenAtom, open => !open)}
+            onPress={() => toggle($)}
           >
             <Text color={PASTEL.working}>{'✦ '}</Text>
             <Text color={isOpen ? PASTEL.working : 'text'} bold={isOpen}>
@@ -214,7 +257,7 @@ export const register: Register = on => {
 
     const { Box, Text, Button } = $.ui.resolve(e)
     const info = await read($, toolboxInfoAtom)
-    const installed = await installedMods($)
+    const installed = await read($, modsAtom)
     const currentModel = modelAlias(info.model)
     const advisor = await read($, advisorInfoAtom)
     const currentAdvisor = advisor.model ? modelAlias(advisor.model) : null
@@ -339,13 +382,14 @@ export const register: Register = on => {
             <Box key="toolbox-mods" flexDirection="row">
               {label('Mods')}
               {buttons(
-                installed.map(({ mod, isOn }) => (
+                installed.map(({ isOn, ...mod }) => (
                   <Button
                     key={`mod-${mod.id}`}
                     variant="secondary"
                     onPress={async () => {
                       const now = (await installedMods($)).find(s => s.mod.id === mod.id)
                       $.ui.toast(await switchMod($, mod, !(now?.isOn ?? isOn)))
+                      await refresh($)
                     }}
                   >
                     <Text color={isOn ? PASTEL.done : PASTEL.stopped}>{isOn ? '●' : '○'}</Text>
