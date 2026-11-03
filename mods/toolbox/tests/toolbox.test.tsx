@@ -345,4 +345,22 @@ describe('toolbox', () => {
     expect(ran).toEqual(['effort-auto off'])
     await band.unmount()
   })
+
+  test('the Effort row highlights the level Auto Effort holds, not the picker\'s', async ($, on) => {
+    on('fs.read', ($, e, next) =>
+      e.path.endsWith('/mods-registry/effort-auto.json')
+        ? ({ value: JSON.stringify({ id: 'effort-auto', isOn: true, effort: 'high' }) } as never)
+        : next(e),
+    )
+    on('turn.step', async function* (_$, e) {
+      return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn', usage: { input_tokens: 1, output_tokens: 1, model: e.model } } as never
+    })
+    await startSession($, on)
+    await $.command.run({ command: 'toolbox', args: '', ...RUN })
+    for await (const chunk of $.turn.step({ turnId: 't', index: 0, model: 'claude-sonnet-5-5', messageCount: 3, effort: 'medium' } as never)) void chunk
+    const band = await $.ui.mount({ ...BAND, surface: 'terminal' })
+    expect(await band.find({ key: 'effort-high' })).toMatchObject({ props: { variant: 'primary' } })
+    expect(await band.find({ key: 'effort-medium' })).toMatchObject({ props: { variant: 'secondary' } })
+    await band.unmount()
+  })
 })

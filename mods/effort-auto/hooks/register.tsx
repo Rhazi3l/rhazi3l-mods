@@ -1,15 +1,14 @@
 // Effort Auto: when it is on, each prompt gets the effort level it needs. A quick model call reads the
 // prompt (and Claude's last reply, for context) before the turn's first request and picks a level with
 // the four questions below; the mod then puts that level on the turn's requests. The picker itself is
-// never touched, so the real level shows as a label beside the picker's, and moving the picker by hand
-// makes the mod let go until the next prompt it has to judge.
+// never touched: the toolbox shows the real level (it reads it from this mod's switchboard file), and
+// moving the picker by hand makes the mod let go until the next prompt it has to judge.
 //
 // Based on Ben AI's Effort Optimizer, cut down to on and off (always auto) and listed in the toolbox.
 
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Level } from '../types'
-import { PASTEL } from './palette'
 import { publishMod } from './registry'
 import type { ModEntry } from './registry'
 
@@ -20,13 +19,10 @@ const ENTRY: ModEntry = {
   description: 'Reads each prompt and sets the effort level it needs',
 }
 
-const LEVEL = { plugin: 'effort-auto', key: 'level' } as const
 const STORE_ON = 'isOn'
 
 const LEVELS: readonly Level[] = ['low', 'medium', 'high', 'xhigh', 'max']
 const NAMES: Record<Level, string> = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Extra high', max: 'Max' }
-/** Fits the footer slot (about 14 cells). */
-const SHORT: Record<Level, string> = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'XHigh', max: 'Max' }
 
 // Module variables start over on a reload; the saved on/off comes back from the store.
 let isOn = true
@@ -105,19 +101,19 @@ async function pick($: EngineInterface, text: string, now: string): Promise<Leve
   return answer.isAnswered ? parsePick(answer.text) : null
 }
 
-async function setLevel($: EngineInterface, level: Level | null) {
-  await $.state.set(LEVEL, level)
+/** Records the level the mod holds, which the toolbox shows as the real one. */
+async function publish($: EngineInterface) {
+  await publishMod($, ENTRY, isOn, { effort: held?.level ?? null })
 }
 
 async function saveOn($: EngineInterface, value: boolean) {
   isOn = value
   await $.store.set(STORE_ON, value)
-  await publishMod($, ENTRY, value)
   if (!value) {
     held = null
     waiting = null
-    await setLevel($, null)
   }
+  await publish($)
 }
 
 export const register: Register = on => {
@@ -125,7 +121,7 @@ export const register: Register = on => {
     const saved = await $.store.get(STORE_ON)
     isOn = typeof saved === 'boolean' ? saved : true
     // Written even when unchanged, so the toolbox lists this mod.
-    await publishMod($, ENTRY, isOn)
+    await publish($)
     try {
       await $.command.register({
         name: 'effort-auto',
@@ -161,7 +157,7 @@ export const register: Register = on => {
     // The picker moved by hand: the mod lets go of the old level.
     if (held && e.effort !== held.base) {
       held = null
-      await setLevel($, null)
+      await publish($)
     }
     if (waiting !== null && e.index === 0) {
       const text = waiting
@@ -171,7 +167,7 @@ export const register: Register = on => {
         const level = await pick($, text, now)
         if (level) {
           held = level === asLevel(e.effort) ? null : { level, base: e.effort }
-          await setLevel($, held?.level ?? null)
+          await publish($)
           if (held) $.ui.toast(`Effort set to ${NAMES[level]} (was ${NAMES[asLevel(e.effort) ?? 'medium']})`)
         }
       } catch {
@@ -180,18 +176,5 @@ export const register: Register = on => {
     }
     if (!held || held.level === asLevel(e.effort)) return yield* next(e)
     return yield* next({ ...e, effort: held.level })
-  })
-
-  // The picker keeps showing the person's own setting, so the real level shows beside it.
-  on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
-    if (!isOn) return next(e)
-    const { value } = await $.state.get(LEVEL)
-    if (!value) return next(e)
-    const label = `Effort ${SHORT[value]}`
-    if (e.surface === 'desktop' || e.surface === 'vscode') {
-      const { Text } = $.ui.resolve(e)
-      return <Text color={PASTEL.working}>{label}</Text>
-    }
-    return next({ ...e, props: { ...e.props, modes: [...e.props.modes, label] } })
   })
 }

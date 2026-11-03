@@ -58,6 +58,17 @@ async function installedMods($: EngineInterface): Promise<{ mod: SiblingMod; isO
   }
 }
 
+/** The level Auto Effort holds for the chat, or null when it is off or holding none. */
+async function autoEffort($: EngineInterface): Promise<string | null> {
+  try {
+    const file = `${$.plugin.root.split('/.claude/')[0] ?? ''}/.claude/mods-registry/effort-auto.json`
+    const entry = JSON.parse(String(await $.fs.read(file))) as { isOn?: unknown; effort?: unknown }
+    return entry.isOn === true && typeof entry.effort === 'string' ? entry.effort : null
+  } catch {
+    return null
+  }
+}
+
 /** Runs the mod's own command, so the mod keeps its value and saves it. */
 async function switchMod($: EngineInterface, mod: SiblingMod, isOn: boolean): Promise<string> {
   try {
@@ -111,16 +122,22 @@ export const register: Register = on => {
     return started
   })
 
-  // The model and effort each main-loop request really goes out with.
+  // The model and effort each main-loop request really goes out with. Auto Effort sets its level on the
+  // request itself, so the level it holds (from its switchboard file) is the real one, and is read again
+  // once the step is done because it picks during the turn's first.
   on('turn.step', async function* ($, e, next) {
-    if (e.agentId === undefined) {
-      const effort = e.effort === undefined ? null : String(e.effort)
+    const track = async () => {
+      if (e.agentId !== undefined) return
+      const effort = (await autoEffort($)) ?? (e.effort === undefined ? null : String(e.effort))
       const info = await read($, toolboxInfoAtom)
       if (info.model !== e.model || info.effort !== effort) {
         await update($, toolboxInfoAtom, now => ({ ...now, model: e.model, effort }))
       }
     }
-    return yield* next(e)
+    await track()
+    const result = yield* next(e)
+    await track().catch(() => undefined)
+    return result
   })
 
   // How full the context window is, for the figure beside the Info button.
