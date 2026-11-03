@@ -101,7 +101,10 @@ export const register: Register = on => {
         const auto = await autoEffort($)
         if (auto === lastAuto) return
         lastAuto = auto
-        await update($, toolboxInfoAtom, now => (auto === null || now.effort === auto ? now : { ...now, effort: auto }))
+        // Auto Effort let go (turned off, or the picker moved): the row goes back to the picker's own level.
+        const saved = auto === null ? (await $.settings.read()).effortLevel : null
+        const shown = auto ?? (typeof saved === 'string' ? saved : null)
+        if (shown !== null) await update($, toolboxInfoAtom, now => (now.effort === shown ? now : { ...now, effort: shown }))
       } catch {
         // The next second looks again.
       }
