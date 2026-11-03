@@ -1,7 +1,7 @@
 // Effort Auto: when it is on, each prompt gets the effort level it needs. A quick model call reads the
 // prompt (and Claude's last reply, for context) before the turn's first request and picks a level with
 // the four questions below; the mod then puts that level on the turn's requests. The picker itself is
-// touched while it runs (turning it off sets Medium): the toolbox shows the real level (it reads it from this mod's switchboard file), and
+// touched: the toolbox shows the real level (it reads it from this mod's switchboard file), and
 // moving the picker by hand makes the mod let go until the next prompt it has to judge.
 //
 // Based on Ben AI's Effort Optimizer, cut down to on and off (always auto) and listed in the toolbox.
@@ -141,19 +141,7 @@ export const register: Register = on => {
     if (args === '') {
       return { text: `Auto Effort is ${isOn ? 'on' : 'off'}${held ? `, holding ${NAMES[held.level]}` : ''}.` }
     }
-    const wasOn = isOn
     await saveOn($, args === 'on')
-    // Turning it off puts the picker back on Medium. Run after this hook has answered: running a command
-    // from inside the command that waits on it would hang the chat.
-    if (wasOn && !isOn) {
-      $.clock.after(300, async () => {
-        try {
-          await $.command.run({ command: 'effort', args: 'medium' })
-        } catch {
-          // The picker stays where it is.
-        }
-      })
-    }
     return { text: `Auto Effort is ${isOn ? 'on' : 'off'}.` }
   })
 

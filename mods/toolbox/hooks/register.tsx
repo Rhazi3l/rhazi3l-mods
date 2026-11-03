@@ -205,6 +205,13 @@ export const register: Register = on => {
           if ((await read($, toolboxInfoAtom)).effort !== named) await update($, toolboxInfoAtom, now => ({ ...now, effort: named }))
         }
       }
+      // Auto Effort let go: the requests are back at the picker's level, so the row shows that level.
+      if (e.command === 'effort-auto' && (await autoEffort($)) === null) {
+        const saved = (await $.settings.read()).effortLevel
+        if (typeof saved === 'string' && (await read($, toolboxInfoAtom)).effort !== saved) {
+          await update($, toolboxInfoAtom, now => ({ ...now, effort: saved }))
+        }
+      }
       if (await read($, toolboxOpenAtom)) await refresh($)
     } catch {
       // The panel keeps what it showed.
