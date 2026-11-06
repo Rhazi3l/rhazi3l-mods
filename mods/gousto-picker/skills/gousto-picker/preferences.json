@@ -66,8 +66,7 @@
       "cucumber",
       "apple",
       "banana",
-      "chickpea",
-      "pulse beans"
+      "chickpea"
     ],
     "stage1": "title match raises a flag only",
     "stage2": "ingredient line match, then usage verdict",
