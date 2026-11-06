@@ -1,0 +1,169 @@
+{
+  "goals": [
+    "fat loss",
+    "muscle gain",
+    "LDL management (soft)",
+    "whole foods, fibre, low UPF"
+  ],
+  "plan": {
+    "portions": 2,
+    "cookDays": [
+      "Mon",
+      "Tue",
+      "Thu",
+      "Fri"
+    ],
+    "requireTwoPortionOption": true
+  },
+  "shortlist": {
+    "stage1": 20,
+    "stage2": 10,
+    "final": 4
+  },
+  "targetsPerPortion": {
+    "satFatG": {
+      "ideal": 3
+    },
+    "saltG": {
+      "ideal": 2,
+      "acceptableOccasional": 2.9
+    },
+    "proteinG": {
+      "min": 30,
+      "noExtraBenefitAbove": 40
+    },
+    "fibreG": {
+      "min": 7
+    },
+    "sugarsG": {
+      "ideal": 10,
+      "note": "added sugar should weigh more than intrinsic; the data does not separate them"
+    }
+  },
+  "stage1": {
+    "excludeDietaryTags": [
+      "vegetarian",
+      "plantBased"
+    ],
+    "excludeDietaryTags_note": "[assumed] none of your past baskets were vegetarian; remove to include them",
+    "maxPerProteinType": 10,
+    "maxPerProteinType_note": "[assumed] stops a chicken-heavy menu filling all 20 slots",
+    "ranking": "protein per 100 kcal, minus 0.03 per cook minute, minus penalties for protein under 30 g",
+    "maxCookMins": 60,
+    "maxCookMins_note": "[assumed] recipes over this are skipped"
+  },
+  "hardDrop": {
+    "ingredientTerms": [
+      "prawn"
+    ],
+    "appliesAt": "stage2"
+  },
+  "flagOnly": {
+    "terms": [
+      "red wine",
+      "balsamic",
+      "feta",
+      "cucumber",
+      "apple",
+      "banana",
+      "chickpea",
+      "pulse beans"
+    ],
+    "stage1": "title match raises a flag only",
+    "stage2": "ingredient line match, then usage verdict",
+    "usageVerdict": {
+      "values": [
+        "separable",
+        "structural",
+        "unclear"
+      ],
+      "evidence": [
+        "title",
+        "ingredient line form (paste, vinegar, sauce, stock, compound mix)",
+        "photo"
+      ],
+      "structuralExcludedFromTop10": true,
+      "listExcludedForOverride": true
+    }
+  },
+  "spice": {
+    "mode": "soft-penalty",
+    "flag": true,
+    "source": "detail data tag, stage 2 only"
+  },
+  "surcharge": {
+    "mode": "flag-only",
+    "source": "menu data, stage 1"
+  },
+  "variety": {
+    "fishBonus": 0.3,
+    "fishBonus_note": "[assumed] subtracted from a fish dish's penalty when choosing the final 4. Nutrition decides; fish only wins close calls. 0 ignores fish."
+  },
+  "bloatingWatchlist": {
+    "mode": "highlight-only",
+    "groups": {
+      "fructans": [
+        "onion",
+        "garlic",
+        "leek",
+        "wheat",
+        "wholewheat",
+        "couscous",
+        "gnocchi",
+        "bulgur",
+        "rye"
+      ],
+      "galactans": [
+        "lentil",
+        "bean",
+        "chickpea",
+        "pea",
+        "soya"
+      ],
+      "polyols": [
+        "mushroom",
+        "cauliflower",
+        "sweet potato",
+        "apple",
+        "pear",
+        "avocado"
+      ],
+      "lactose": [
+        "milk",
+        "cream",
+        "yoghurt",
+        "soft cheese",
+        "cream cheese",
+        "mascarpone"
+      ],
+      "fructose": [
+        "honey",
+        "agave",
+        "apple juice"
+      ],
+      "brassicas": [
+        "broccoli",
+        "cabbage",
+        "cauliflower",
+        "brussels",
+        "kale"
+      ],
+      "fibreHeavy": [
+        "brown rice",
+        "wholewheat",
+        "bran",
+        "oat"
+      ],
+      "sweeteners": [
+        "sorbitol",
+        "mannitol",
+        "xylitol"
+      ]
+    }
+  },
+  "speedWeight": {
+    "stage1": 0.03,
+    "stage2": 1.0,
+    "note": "[assumed] higher ranks quicker meals higher. Stage 2 adds minutes/60 x weight to the penalty."
+  }
+}

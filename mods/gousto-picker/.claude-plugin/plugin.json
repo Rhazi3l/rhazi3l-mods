@@ -1,0 +1,8 @@
+{
+  "name": "gousto-picker",
+  "version": "1.0.0",
+  "description": "Shortlists a week's Gousto recipes against personal nutrition targets: top 20 from the menu, a detail check to a top 10, and a proposed 4. Run it with /gousto-picker.",
+  "author": {
+    "name": "Rhazi3l"
+  }
+}

@@ -29,6 +29,11 @@
       "name": "effort-auto",
       "source": "./mods/effort-auto",
       "description": "Reads each prompt and sets the effort level it needs, by itself. Just on or off, from the toolbox or /effort-auto."
+    },
+    {
+      "name": "gousto-picker",
+      "source": "./mods/gousto-picker",
+      "description": "/gousto-picker shortlists a week's Gousto recipes against your nutrition targets: top 20, then a detail check to a top 10 and a proposed 4."
     }
   ]
 }
