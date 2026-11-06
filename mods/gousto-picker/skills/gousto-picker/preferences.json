@@ -161,9 +161,17 @@
       ]
     }
   },
-  "speedWeight": {
-    "stage1": 0.03,
-    "stage2": 1.0,
-    "note": "[assumed] higher ranks quicker meals higher. Stage 2 adds minutes/60 x weight to the penalty."
+  "weights": {
+    "satFat": 2,
+    "salt": 2,
+    "saltOverAcceptable": 1,
+    "protein": 2,
+    "fibre": 1.5,
+    "sugar": 1,
+    "hot": 0.5,
+    "speedStage1": 0.03,
+    "speedStage2": 1.0,
+    "proteinShortfallStage1": 0.15,
+    "note": "[assumed] Stage 2 penalty = each target miss as a fraction of its limit x its weight, plus hot, plus minutes/60 x speedStage2. Lower penalty ranks higher. Stage 1 score = protein per 100 kcal, minus proteinShortfallStage1 per gram under the protein minimum, minus speedStage1 per cook minute."
   }
 }

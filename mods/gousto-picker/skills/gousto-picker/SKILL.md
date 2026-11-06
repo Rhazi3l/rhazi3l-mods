@@ -30,4 +30,4 @@ Let `DIR` be the folder holding this SKILL.md. Outputs go to `~/.local/share/gou
 - Heat is a soft penalty and surcharge is flag-only.
 - Nutrition decides the proposed 4. Fish only wins close calls (`variety.fishBonus`).
 - Menus exist for Mondays only. The script warns on any other date.
-- Ranking weights live in `penalty()` in the script and are assumptions, not user-set. Sugar cannot separate added from intrinsic.
+- Ranking weights are in `weights` in `preferences.json`. They are assumptions, not user-set, so say so if asked. Sugar cannot separate added from intrinsic.

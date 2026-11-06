@@ -29,6 +29,7 @@ ALL_RECIPES = "ca8f71be-63ac-11e6-a693-068306404bab"
 DEVICE = str(uuid.uuid4())
 PORTIONS = PREFS["plan"]["portions"]
 TARGETS = PREFS["targetsPerPortion"]
+W = PREFS["weights"]
 FLAG_TERMS = PREFS["flagOnly"]["terms"]
 DROP_TERMS = PREFS["hardDrop"]["ingredientTerms"]
 
@@ -106,7 +107,7 @@ def stage1(date, run):
     if "content" not in menu:
         sys.exit(f"No menu for {date}: {menu.get('detail') or menu}")
     rows = [parse_item(i) for c in menu["content"] if c["type"] == "recipe-grid" for i in c["items"]]
-    s1, pmin, speed = PREFS["stage1"], TARGETS["proteinG"]["min"], PREFS["speedWeight"]["stage1"]
+    s1, pmin = PREFS["stage1"], TARGETS["proteinG"]["min"]
     skipped, missing, pool = Counter(), [], []
     for r in rows:
         if None in (r["kcal"], r["protein"], r["mins"]):
@@ -119,7 +120,8 @@ def stage1(date, run):
         elif r["dietary"] & set(s1["excludeDietaryTags"]):
             skipped["dietary tag"] += 1
         else:
-            r["score"] = round(r["protein"] / r["kcal"] * 100 - max(0, pmin - r["protein"]) * 0.15 - r["mins"] * speed, 2)
+            r["score"] = round(r["protein"] / r["kcal"] * 100 - max(0, pmin - r["protein"]) * W["proteinShortfallStage1"]
+                           - r["mins"] * W["speedStage1"], 2)
             r["flags"] = [t for t in FLAG_TERMS + DROP_TERMS if has(t, r["title"])]
             pool.append(r)
     top, kinds = [], Counter()
@@ -189,13 +191,13 @@ def penalty(a):
     def over(key, limit):
         return max(0, val(a, key) - limit) / limit
 
-    p = 2 * over("sat", t["satFatG"]["ideal"]) + 2 * over("salt", t["saltG"]["ideal"])
-    p += val(a, "salt") > t["saltG"]["acceptableOccasional"]
-    p += 2 * max(0, t["proteinG"]["min"] - val(a, "protein")) / t["proteinG"]["min"]
-    p += 1.5 * max(0, t["fibreG"]["min"] - val(a, "fibre")) / t["fibreG"]["min"]
-    p += over("sugar", t["sugarsG"]["ideal"])
-    p += 0.5 * any("hot" in s.lower() for s in a["spice"])
-    p += (a["mins"] or 0) / 60 * PREFS["speedWeight"]["stage2"]
+    p = W["satFat"] * over("sat", t["satFatG"]["ideal"]) + W["salt"] * over("salt", t["saltG"]["ideal"])
+    p += W["saltOverAcceptable"] * (val(a, "salt") > t["saltG"]["acceptableOccasional"])
+    p += W["protein"] * max(0, t["proteinG"]["min"] - val(a, "protein")) / t["proteinG"]["min"]
+    p += W["fibre"] * max(0, t["fibreG"]["min"] - val(a, "fibre")) / t["fibreG"]["min"]
+    p += W["sugar"] * over("sugar", t["sugarsG"]["ideal"])
+    p += W["hot"] * any("hot" in s.lower() for s in a["spice"])
+    p += (a["mins"] or 0) / 60 * W["speedStage2"]
     return round(p, 2)
 
 
