@@ -34,6 +34,11 @@
       "name": "gousto-picker",
       "source": "./mods/gousto-picker",
       "description": "/gousto-picker shortlists a week's Gousto recipes against your nutrition targets: top 20, then a detail check to a top 10 and a proposed 4."
+    },
+    {
+      "name": "dashboard-polish",
+      "source": "./mods/dashboard-polish",
+      "description": "A skill that restyles or builds dashboards on a charcoal and orange base with pastel data colours and dark and light modes. Adapted from unslop (CC BY 4.0)."
     }
   ]
 }

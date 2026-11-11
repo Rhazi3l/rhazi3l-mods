@@ -10,6 +10,7 @@ Personal Claude Code mods. Each one is its own plugin, so install only the ones 
 | **effort-auto** | Picks the effort level each prompt needs and sets it for you. On or off, nothing else: when it is on, a quick Sonnet 5.5 call reads each prompt before Claude starts and applies four questions (back and forth or simple is Low; a hidden mistake would cost money, a client or trust is High; a long, hard, critical hand-off is Extra high, Max only when asked; everything else Medium). Approvals like "yes" keep the level. It sets the level on the requests, not the picker, so the toolbox's Effort row highlights the level really in use and a toast says what changed; moving the picker by hand makes it let go until the next prompt. Slash commands and helper agents are never judged. Based on Ben AI's Effort Optimizer, cut down to on and off. | `/effort-auto on\|off`, the Info panel's Mods button |
 | **gousto-picker** | Not a mod but a skill, in the same marketplace so it installs the same way. Run `/gousto-picker <delivery Monday>` to shortlist that week's Gousto recipes against your nutrition targets: the menu is ranked to a top 20, a detail check (full nutrition, ingredients, heat) narrows it to a top 10, and a proposed 4 follows. Flagged ingredients (red wine, balsamic and so on) get a usage judgement, a bloating watchlist is highlighted but never filters, and prawn is the only hard drop. Your rules and targets are in `mods/gousto-picker/skills/gousto-picker/preferences.json`. Needs `python3`; no login. It uses undocumented Gousto endpoints, so keep it to light personal use. Results save under `~/.local/share/gousto-picker/`. Tests: `python3 mods/gousto-picker/tests/test_gousto.py`. | `/gousto-picker <date>` |
 | **clean-view** | A plain-English checklist above the prompt in place of the technical rows: a framed box whose colour says how the job stands (orange working, blue needs you, yellow stuck, green done), the steps with their bars, the latest action and note, and a **Details** pane with every step, action and note in full. Hides the tool rows, Claude's own narration and helper plumbing; alerts you when a long job ends. Full description in [`mods/clean-view/README.md`](mods/clean-view/README.md). | `Details` (or `d`) button, `/view on\|off\|alerts on\|alerts off`, the Info panel's Mods button |
+| **dashboard-polish** | A skill, not a mod. Ask for it by name ("use dashboard-polish on this dashboard") to restyle an existing dashboard or build a new one. It audits the AI-looking tells, writes a five-line direction and waits for your go-ahead, then fixes spacing, colour, icons, copy and type in order. The base is fixed (the rhazi3l theme's dark charcoal and `#d4743c` orange); the pastel data colours, taken from clean-view, are a guide only. Always has dark and light modes, dark by default. Palette and contrast working are in `mods/dashboard-polish/skills/dashboard-polish/references/palette.md`. Adapted from [unslop](https://github.com/heydamir/unslop) by Damir Sokolovsky (CC BY 4.0). To use it on claude.ai or the desktop app chat, zip the folder (see below) and upload it under Settings > Capabilities. | `use dashboard-polish` |
 
 ## Install
 
@@ -24,11 +25,22 @@ At the prompt of a terminal session, one line per mod:
 /plugin install deskbar --marketplace Rhazi3l/rhazi3l-mods
 /plugin install effort-auto --marketplace Rhazi3l/rhazi3l-mods
 /plugin install gousto-picker --marketplace Rhazi3l/rhazi3l-mods
+/plugin install dashboard-polish --marketplace Rhazi3l/rhazi3l-mods
 ```
 
 Answer `y` to add the marketplace, then pick the user scope. From a shell, the same with `claude plugin install …`.
 
 In the desktop app: click + next to the prompt box, then Plugins, Add marketplace with `Rhazi3l/rhazi3l-mods`, then Add plugin for each mod.
+
+### Upload a skill to claude.ai or the desktop app chat
+
+Those need a zip with the skill folder at its root, which git does not hold. On any computer with the repository:
+
+```
+cd mods/dashboard-polish/skills && zip -r ~/dashboard-polish.zip dashboard-polish
+```
+
+Then Settings > Capabilities > Upload skill. Re-zip and re-upload after the skill changes.
 
 ## Updating
 
@@ -42,6 +54,7 @@ claude plugin update prompt-upgrade@rhazi3l-mods
 claude plugin update deskbar@rhazi3l-mods
 claude plugin update effort-auto@rhazi3l-mods
 claude plugin update gousto-picker@rhazi3l-mods
+claude plugin update dashboard-polish@rhazi3l-mods
 ```
 
 then `/reload-plugins` in any open session.
