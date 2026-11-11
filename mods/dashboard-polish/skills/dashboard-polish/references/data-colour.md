@@ -6,8 +6,8 @@ There is no fixed data palette. Choose the colours for the product, under these 
 
 - Do use soft pastels in both modes: moderately saturated hues, at least 3 to 1 against the card on dark. Do not use vivid or neon colours.
 - Do keep the same hue in light mode. Lower the saturation (about 25 percent) and darken only as far as the 3 to 1 target against the light card needs, so the colours stay soft. Text coloured with a data hue needs 4.5 to 1.
-- Do reserve green for good or done, red for bad, and yellow for warning. Use each only for that meaning, and only when the data has that state. Do not use them for categories.
-- Do give each category one colour that no other category or meaning uses, including the accent, green, yellow and red. Reusing a colour for a second meaning is a defect unless the report names it.
+- Do reserve green for good or done and red for bad. Use each only for that meaning, and only when the data has that state. Do not use them for categories. Yellow and every other hue are free for categories.
+- Do give each category one colour that no other category or meaning uses, including the accent, green and red. Reusing a colour for a second meaning is a defect unless the report names it.
 - Do use only the colours the data needs. Do not add a colour to fill a palette. If there are more categories than colours, group the rest.
 - Do space category hues at least 40 degrees apart on the wheel. Hues within 40 degrees count as one hue, so teal beside green or pink beside magenta is too close.
 - Do use at most two tones of any hue across the dashboard, for example a strong fill and a soft tint. A third shade is a defect, so take a different hue instead.

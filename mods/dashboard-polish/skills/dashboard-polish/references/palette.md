@@ -1,45 +1,23 @@
-# Palette: neutrals and accent
+# Palette: backgrounds and accent
 
-Fixed. Do not change these per dashboard. The accent is from the user's Omarchy theme `rhazi3l`, and the dark neutrals match its page and card. The light values are derived from the same family. If the theme changes, change this file only.
+Only the values in the first two tables are fixed. Do not change them per dashboard. Everything after them is a guideline. The accent and dark neutrals match the user's Omarchy theme `rhazi3l`. If the theme changes, change this file only.
 
-## Dark (default)
+## Fixed
 
-| Role | Value | Note |
+| Role | Dark (default) | Light |
 |---|---|---|
-| Page | `#151618` | |
-| Card | `#202225` | |
-| Border | `#303338` | 1px hairline |
-| Text primary | `#d2d2d2` | |
-| Text secondary | `#b6b6b6` | midpoint of primary and muted |
-| Text muted | `#9b9b9b` | |
-| Selected row | `#443229` | the accent at 20% over the card |
-| Hover and bar track | `#2e3033` | the primary text at 8% over the card |
-| Accent fill | `#d4743c` | text on it is `#151618` |
-| Accent as text | `#d4743c` | |
+| Page | `#151618` | `#e8eaee` |
+| Card | `#202225` | `#f5f6f8` |
+| Border | `#303338` | `#d3d8e0` |
+| Accent (burnt orange) | `#d4743c` | `#af5926` |
 
-## Light
+The dark ramp has only a faint cool tint, between plain charcoal and a blue-tinted theme. The light card is a soft off-white and never pure white, because pure white is too bright. Check data colours against this card, not against white, since they lose about 0.5 of contrast. Borders are 1px hairlines.
 
-| Role | Value | Note |
-|---|---|---|
-| Page | `#e8eaee` | |
-| Card | `#f5f6f8` | a soft off-white, never pure white |
-| Border | `#d3d8e0` | 1px hairline |
-| Text primary | `#16181d` | |
-| Text secondary | `#4a5262` | |
-| Text muted | `#5d6677` | |
-| Selected row | `#eedcd2` | derived: the accent fill at 20% over the card |
-| Hover and bar track | `#e3e4e6` | derived: the primary text at 8% over the card |
-| Accent fill | `#af5926` | text on it is white |
-| Accent as text | `#af5926` | |
+## Guidelines, not values
 
-The dark ramp has only a faint cool tint, between plain charcoal and a blue-tinted theme. Keep text and borders neutral with the same faint tint.
-
-Do not use pure white for a card, because it is too bright. Check data colours against this card, not against white, since they lose about 0.5 of contrast.
-
-## Contrast working
-
-Approximate, from relative luminance. Recheck with a script if any value changes.
-
-- Dark, on the card: primary about 10.5 to 1, secondary about 7.9, muted about 5.7, accent as text about 4.8. `#151618` text on the accent fill about 5.5.
-- Light, on the card: secondary about 7.3, muted about 5.4, accent as text about 4.5. White on the accent fill `#af5926` about 4.9.
-- The plain `#d4743c` as text on light is about 3.1, so it fails and `#af5926` is used.
+- Text has three neutral roles, with the same faint tint as the surfaces. Primary is at least 10 to 1 on the card, secondary about 7 to 1, and muted at least 5 to 1. Choose the shades to meet these, in each mode.
+- The selected tint is the accent at 20 percent over the card. The hover and bar-track tint is the primary text colour at about 8 percent, so it stays neutral. Work these out per mode.
+- Text on an orange fill is dark in dark mode and white in light mode (about 4.9 to 1 on `#af5926`).
+- Accent used as text needs 4.5 to 1 on the card. The plain `#d4743c` as text on light is about 3.1, so light mode uses `#af5926`.
+- Check every pair with a script, not by eye, and list any text and background pair below 4.5 to 1 in the report.
+- Do not use a fixed data palette. Data colours follow [data-colour.md](data-colour.md).

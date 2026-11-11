@@ -54,10 +54,10 @@ Skip the audit. Write the five lines, then build to the passes below and [refere
 
 ## 2. Colour
 
-Fixed base: a charcoal with a faint cool tint and the burnt orange accent `#d4743c`, in both modes. All values are in [references/palette.md](references/palette.md). Do not change them.
+Only the page, card and border colours and the burnt orange accent are fixed hex values, in both modes. They are in [references/palette.md](references/palette.md). Do not change them. Every other colour (text, tints, data) is a guideline set by contrast and the rules here, not a hex value.
 
 - Do build surfaces, borders and text from the neutral ramp only. The data carries the colour.
-- Do use three text roles: primary, secondary, muted.
+- Do use three neutral text roles: primary, secondary, muted. Set them by the contrast targets in the palette reference, with the same faint tint as the surfaces.
 - Do use orange for the primary action and button fills, selection, focus, the outline of a selected or focused box, and the fixed decorative uses in the page structure reference.
 - Do not use orange as a data colour: not for a bar, dot, segment, tag or any status, including in progress.
 - Do use hairline borders at rest. On dark, depth comes from surface steps and hairlines, not shadows. On light, shadows are neutral, soft and small.
@@ -105,6 +105,9 @@ Apply in the first pass, so they do not have to be asked for. Rules and values a
 - Do list the knock-on effects of each change, such as other panels that share a style, each with its fix.
 - Do state what the change costs, such as taller rows or a narrower bar.
 
-## Not covered
+## Hero visuals and motion
 
-Do not generate hero visuals, motion or story videos, and do not redesign the layout beyond the page structure reference. If the user wants those, say so and suggest the original unslop.
+- Do keep them simple, and only where the dashboard already has them or the user asks. Do not add them by default.
+- Do make a hero visual one calm image or illustration from the product's world, on a quiet area of the page. Do not put it behind data, and do not use gradients or glows.
+- Do keep motion to short fades and state changes (about 150 to 200 ms), and none when the user prefers reduced motion. Do not use looping, pulsing or attention-seeking animation.
+- Do not redesign the layout beyond the page structure reference, and do not make story videos. If the user wants those, say so and suggest the original unslop.
