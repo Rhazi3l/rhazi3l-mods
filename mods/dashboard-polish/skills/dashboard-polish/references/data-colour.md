@@ -1,6 +1,6 @@
 # Data colour, chart forms and keys
 
-There is no fixed data palette. Choose the colours for the product, under these rules. The only fixed colours are the neutral ramp and the orange accent in [palette.md](palette.md).
+There is no fixed data palette. Choose the colours for the product, under these rules. Do not copy a palette from a previous dashboard. The only fixed colours are the neutral ramp and the orange accent in [palette.md](palette.md).
 
 ## Choosing colours
 
