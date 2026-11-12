@@ -1,6 +1,6 @@
 # Palette: backgrounds and accent
 
-Only the values in the first two tables are fixed. Do not change them per dashboard. Everything after them is a guideline. The accent and dark neutrals match the user's Omarchy theme `rhazi3l`. If the theme changes, change this file only.
+Only the values in the first two tables are fixed. Do not change them per dashboard. Everything after them is a guideline. If a value changes, change this file only.
 
 ## Fixed
 

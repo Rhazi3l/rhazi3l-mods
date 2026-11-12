@@ -1,6 +1,6 @@
 {
   "name": "dashboard-polish",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Restyles an existing dashboard, or builds a new one, so it stops looking AI-generated: audit, then spacing, colour, icons, copy and type, on a charcoal and burnt-orange base with pastel data colours and dark and light modes. Adapted from unslop (CC BY 4.0).",
   "author": {
     "name": "Rhazi3l"

@@ -59,6 +59,7 @@ Only the page, card and border colours and the burnt orange accent are fixed hex
 - Do build surfaces, borders and text from the neutral ramp only. The data carries the colour.
 - Do use three neutral text roles: primary, secondary, muted. Set them by the contrast targets in the palette reference, with the same faint tint as the surfaces.
 - Do use orange for the primary action and button fills, selection, focus, the outline of a selected or focused box, and the fixed decorative uses in the page structure reference.
+- Do put a 3px orange vertical bar, one heading tall, before every card and panel title, with the title above its box (see the page structure reference). This is the main orange accent on the page.
 - Do not use orange as a data colour: not for a bar, dot, segment, tag or any status, including in progress.
 - Do use hairline borders at rest. On dark, depth comes from surface steps and hairlines, not shadows. On light, shadows are neutral, soft and small.
 - Do not use hue-to-hue gradients, glows, coloured shadows, gradient text or colour washes behind content. A gradient is allowed only as a small tone shift inside one neutral.

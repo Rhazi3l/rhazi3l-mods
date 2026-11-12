@@ -28,15 +28,14 @@ There is no fixed data palette. Choose the colours for the product, under these 
 
 ## Chart forms
 
-- Do pick the form from the data, and do not draw every panel the same way.
-  - Segmented bar: shares of one whole, where the parts do not overlap and add up to one whole.
-  - Vertical columns: a time series, oldest on the left.
+- Do pick the form that makes sense for the data and reads clearly. No chart type is banned. Examples, not a closed list:
+  - Segmented bar, pie or ring: shares of one whole, where the parts do not overlap and add up to one whole.
+  - Vertical columns or a line: a time series, oldest on the left.
   - Horizontal bars: ranked categories.
   - Dot plot: a rate or share per category. One row per category, one marker on a 0 to 100% scale, sorted high to low, the figure on the right.
   - Table: detail.
-- Do not use rings or pies, or a grid of small ones.
-- Do not use a pie or segmented bar for categories that overlap, such as tags where an item can have several. They are not parts of a whole.
-- Do use a form at most twice on one dashboard, and prefer a different form where the data allows.
+- Do not show categories that overlap, such as tags where an item can have several, as parts of a whole. Pick a form that does not imply they add up.
+- Do not repeat one form more than twice on a dashboard, and prefer a different form where the data allows.
 - Do give every panel the same bar thickness, radius, marker and key rules.
 - Do give a clickable column or bar the same hover, selected and faded states as a row.
 
