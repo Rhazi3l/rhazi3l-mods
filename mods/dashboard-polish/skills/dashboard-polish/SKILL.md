@@ -15,7 +15,7 @@ Keep the product. Features, numbers and section order stay. Every size, colour, 
 ## Restyling an existing dashboard
 
 1. Look at it. If you can render it, do so, so you judge what people see and not only the code.
-2. Audit. List every tell with where it lives, one line each. Typical tells: hue gradients, glows, gradient text, emoji labels, "New" badges, tracked uppercase labels, greeting headlines, exclamation marks, uneven spacing, many font weights, many greys, grey bars, the same chart form repeated.
+2. Audit. List every tell with where it lives, one line each. Typical tells: hue gradients, glows, gradient text, emoji labels, "New" badges, tracked uppercase labels, greeting headlines, exclamation marks, uneven spacing, many font weights, many greys, grey bars, the same chart form repeated, bars too thin or too thick for how many there are.
 3. Write five lines.
    - Product: what it does and for whom.
    - Character: two or three concrete words. Not clean, modern, sleek, minimal or premium.
@@ -96,7 +96,7 @@ Only the page, card and border colours and the burnt orange accent are fixed hex
 
 ## 6. Bars, tables and alignment
 
-Apply in the first pass, so they do not have to be asked for. Rules and values are in [references/bars-tables.md](references/bars-tables.md).
+Apply in the first pass, so they do not have to be asked for. Bar thickness adapts to the number of bars, the card size and the window size. Rules and values are in [references/bars-tables.md](references/bars-tables.md).
 
 ## Reporting back
 

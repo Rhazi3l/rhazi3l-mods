@@ -6,9 +6,9 @@ Define each of these once, as a variable, and use it everywhere. Do not write th
 
 | Token | Used by | Rule |
 |---|---|---|
-| Row height | table rows, bar rows, legend rows, list rows, buttons, inputs, selects | one value, a multiple of 4 (28px). Only wrapping text rows grow |
-| Bar thickness | progress bars, bar-list tracks | one value (8px). A headline segmented bar may be larger, and is named in the report |
-| Bar radius | every bar, fill and track | one value (4px) |
+| Row height | table rows, bar rows, legend rows, list rows, buttons, inputs, selects | one value, a multiple of 4 (28px). Only wrapping text rows and rows of thick bars (thickness plus 8px) grow |
+| Bar thickness | standalone bar and column charts | tiered by the number of bars (see bars-tables.md), one value per chart, the same value for charts in the same tier. Bars in table and list rows use one value (8px). A headline segmented bar may be larger, and is named in the report |
+| Bar radius | every bar, fill and track | half the bar thickness, so bars are pills |
 | Track tint | every bar track | the same faint neutral (text at about 8 percent) |
 | Marker size and radius | status dots, series squares, legend and key squares, the marker beside a figure | one size (12px), one radius (3px) |
 | Chip height | filter chips, platform tags, any tag | one value (24px) |

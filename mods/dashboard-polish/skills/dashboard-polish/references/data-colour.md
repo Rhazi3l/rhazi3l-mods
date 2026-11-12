@@ -36,7 +36,7 @@ There is no fixed data palette. Choose the colours for the product, under these 
   - Table: detail.
 - Do not show categories that overlap, such as tags where an item can have several, as parts of a whole. Pick a form that does not imply they add up.
 - Do not repeat one form more than twice on a dashboard, and prefer a different form where the data allows.
-- Do give every panel the same bar thickness, radius, marker and key rules.
+- Do give every panel the same bar radius rule (half the thickness), marker and key rules, and set bar thickness by the tiers in [bars-tables.md](bars-tables.md).
 - Do give a clickable column or bar the same hover, selected and faded states as a row.
 
 ## Keys
