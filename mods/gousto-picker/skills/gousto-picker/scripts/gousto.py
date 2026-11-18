@@ -121,7 +121,8 @@ def stage1(date, run):
             skipped["dietary tag"] += 1
         else:
             r["score"] = round(r["protein"] / r["kcal"] * 100 - max(0, pmin - r["protein"]) * W["proteinShortfallStage1"]
-                           - r["mins"] * W["speedStage1"], 2)
+                           - r["mins"] * W["speedStage1"]
+                           - max(0, r["mins"] - s1["preferredMaxMins"]) * W["overPreferredStage1"], 2)
             r["flags"] = [t for t in FLAG_TERMS + DROP_TERMS if has(t, r["title"])]
             pool.append(r)
     top, kinds = [], Counter()
@@ -198,6 +199,7 @@ def penalty(a):
     p += W["sugar"] * over("sugar", t["sugarsG"]["ideal"])
     p += W["hot"] * any("hot" in s.lower() for s in a["spice"])
     p += (a["mins"] or 0) / 60 * W["speedStage2"]
+    p += max(0, (a["mins"] or 0) - PREFS["stage1"]["preferredMaxMins"]) / 30 * W["overPreferredStage2"]
     return round(p, 2)
 
 

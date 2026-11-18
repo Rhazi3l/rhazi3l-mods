@@ -49,8 +49,10 @@
     "maxPerProteinType": 10,
     "maxPerProteinType_note": "[assumed] stops a chicken-heavy menu filling all 20 slots",
     "ranking": "protein per 100 kcal, minus 0.03 per cook minute, minus penalties for protein under 30 g",
-    "maxCookMins": 60,
-    "maxCookMins_note": "[assumed] recipes over this are skipped"
+    "maxCookMins": 44,
+    "maxCookMins_note": "[user-set] recipes of 45 min or more are skipped",
+    "preferredMaxMins": 30,
+    "preferredMaxMins_note": "[user-set] ideally everything cooks in 30 min or less; minutes over this are penalised extra"
   },
   "hardDrop": {
     "ingredientTerms": [
@@ -170,7 +172,9 @@
     "hot": 0.5,
     "speedStage1": 0.03,
     "speedStage2": 1.0,
+    "overPreferredStage1": 0.06,
+    "overPreferredStage2": 1.5,
     "proteinShortfallStage1": 0.15,
-    "note": "[assumed] Stage 2 penalty = each target miss as a fraction of its limit x its weight, plus hot, plus minutes/60 x speedStage2. Lower penalty ranks higher. Stage 1 score = protein per 100 kcal, minus proteinShortfallStage1 per gram under the protein minimum, minus speedStage1 per cook minute."
+    "note": "[assumed] Stage 2 penalty = each target miss as a fraction of its limit x its weight, plus hot, plus minutes/60 x speedStage2, plus (minutes over preferredMaxMins)/30 x overPreferredStage2. Lower penalty ranks higher. Stage 1 score = protein per 100 kcal, minus proteinShortfallStage1 per gram under the protein minimum, minus speedStage1 per cook minute, minus overPreferredStage1 per minute over preferredMaxMins."
   }
 }
