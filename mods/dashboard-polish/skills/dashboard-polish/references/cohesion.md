@@ -6,13 +6,13 @@ Define each of these once, as a variable, and use it everywhere. Do not write th
 
 | Token | Used by | Rule |
 |---|---|---|
-| Row height | table rows, bar rows, legend rows, list rows, buttons, inputs, selects | one value, a multiple of 4 (28px). Only wrapping text rows grow |
-| Bar thickness | progress bars, bar-list tracks | one value (8px). A headline segmented bar may be larger, and is named in the report |
+| Row height | table rows, legend rows, list rows, buttons, inputs, selects, dropdown rows | one value (28px). Only wrapping text rows grow. Bar-list rows are at least 40px |
+| Bar thickness | progress bars in table cells, bar-list tracks, chart bars | three values (8px, 24px, chart maximum 24px), one per kind. A headline segmented bar may be larger, and is named in the report |
 | Bar radius | every bar, fill and track | one value (4px) |
 | Track tint | every bar track | the same faint neutral (text at about 8 percent) |
 | Marker size and radius | status dots, series squares, legend and key squares, the marker beside a figure | one size (12px), one radius (3px) |
-| Chip height | filter chips, platform tags, any tag | one value (24px) |
-| Card padding, heading and note spacing | every card | same padding, heading size and margin, note style |
+| Chip height | filter chips, segmented buttons, any tag | one value (24px) |
+| Card padding and gaps | every card | the spacing tokens in pass 1 of SKILL.md (card padding, gap between cards, title to box, key to chart, note to content), same on every card |
 | Link style | every link | one colour (secondary), one underline, one hover (primary) |
 | Hover and selected | every clickable row, legend item, list item | the same hover tint, selected tint and corner radius |
 | Separators | tables and text lists | hairline between rows. Bar rows have none |
@@ -34,7 +34,7 @@ Count from the code, for example by listing every distinct `font-size`, `font-we
 
 Type
 - Do set one family once on the page wrapper. No panel sets its own.
-- Do use four sizes: caption (tables, lists, notes, controls, legends, keys, chips, and the sub-text under a figure), body (running text and the lead line), heading (every title: section titles and titles of headline boxes), title (page title and headline figures). A fifth size is a defect.
+- Do use four sizes (12, 14, 16 and 28px): caption (12px: tables, lists, notes, controls, legends, chips, the sub-text under a figure, and the info mark), body (14px: running text, the lead line, bar-list labels and doughnut keys), heading (every title: section titles and titles of headline boxes), title (28px: page title, headline figures, and a doughnut's centre total). A fifth size is a defect.
 - Do make all titles one size, one colour (primary) and one weight. A small box title beside large section titles is a defect.
 - Do use one weight (400), tabular figures, and no uppercase, letter-spacing or italics.
 
