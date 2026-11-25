@@ -73,4 +73,14 @@ Run the dashboard-polish sweep (references/cohesion.md) and every check under it
 
 ## Missing skills
 
-If a stage's skill is not installed, say which one, skip that stage, and carry on. On a new machine: ui-ux-pro-max, frontend-design and impeccable are plugins; web-design-guidelines installs with `npx skills add vercel-labs/agent-skills` (keep only that one).
+Before Stage 0, check that all five skills are available: `dashboard-polish:dashboard-polish`, `ui-ux-pro-max:ui-ux-pro-max`, `frontend-design:frontend-design`, `impeccable:impeccable`, `web-design-guidelines`. If any is missing, list it with its install line below and ask whether to stop or continue without that stage. Never continue without dashboard-polish: it is the brief.
+
+```
+/plugin install dashboard-polish@rhazi3l-mods
+/plugin marketplace add nextlevelbuilder/ui-ux-pro-max-skill
+/plugin install ui-ux-pro-max@ui-ux-pro-max-skill
+/plugin install frontend-design@anthropic-plugin-directory
+/plugin marketplace add pbakaus/impeccable
+/plugin install impeccable@impeccable
+npx skills add vercel-labs/agent-skills --skill web-design-guidelines -g
+```
