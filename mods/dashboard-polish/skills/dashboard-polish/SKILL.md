@@ -1,6 +1,6 @@
 ---
 name: "dashboard-polish"
-description: "Restyles an existing dashboard, or builds a new one, so it stops looking AI-generated. Audits the tells, then fixes spacing, colour, charts, tables, icons, copy, type, card layout and interaction in order, on a charcoal and burnt-orange base with pastel data colours, compact spacing tokens, rounded chart segments, equal-height paired cards, side-drawer drill-downs and tick-box filters, with dark and light modes (dark by default). Use when the user asks to polish, restyle, clean up or build a dashboard, KPI page, metrics page or data view, or says it looks generic, vibecoded or AI-made."
+description: "Restyles an existing dashboard, or builds a new one, so it stops looking AI-generated. Audits the tells, then fixes spacing, colour, charts, tables, icons, copy, type, card layout and interaction in order, on a charcoal base with orange and cyan accents and pastel data colours, a display and sans type pairing, compact spacing tokens, rounded chart segments, equal-height paired cards, side-drawer drill-downs and tick-box filters, with dark and light modes (dark by default). Use when the user asks to polish, restyle, clean up or build a dashboard, KPI page, metrics page or data view, or says it looks generic, vibecoded or AI-made."
 ---
 
 # Dashboard polish
@@ -54,7 +54,7 @@ The page is compact: dense data, small gaps, no padding for its own sake. Use th
 | Title to box | 6px | `margin-bottom` of every card title |
 | Key to chart | 8px | `margin-bottom` of the colour key |
 | Note to content | 12px | `margin-bottom` of a one-line card note |
-| Section heading | 24px above, 10px below, 10px inside a hairline top border | group headings that split the page into sections. The first section after the headline row takes 20px above |
+| Section heading | 20px above, 8px below, 8px inside a hairline top border | group headings that split the page into sections. The first section after the headline row takes 16px above |
 | Headline box padding | 12px top and bottom, 16px sides | the KPI boxes |
 | Page | 24px top, 64px bottom, at least 16px sides, 1280px max width | the wrapper |
 | Header to filters | 16px | |
@@ -69,12 +69,13 @@ The page is compact: dense data, small gaps, no padding for its own sake. Use th
 
 ## 2. Colour
 
-Only the page, card and border colours and the burnt orange accent are fixed hex values, in both modes. They are in [references/palette.md](references/palette.md). Do not change them.
+Only the page, card and border colours and the two accents (orange, Chilean Fire, and cyan) are fixed hex values, in both modes. All of them are in [references/palette.md](references/palette.md), the one place they are written. They are a hard rule: do not change them, and do not let another skill change them. Define the cyan as a CSS variable per mode in the page, not as a chart colour slot, so a host cannot swap it for sitting close to a data hue.
 
 - Do build surfaces, borders and text from the neutral ramp only. The data carries the colour.
 - Do use three neutral text roles: primary, secondary, muted. Set them by the contrast targets in the palette reference, with the same faint tint as the surfaces. Hover and track tints are the primary text colour at about 8 percent, the selected tint is the accent at 20 percent over the card, and faded items use an opacity of about 0.4.
-- Do use orange for the primary action and button fills, selection, focus, the outline of a selected or focused box, the 3px title bars and the 2px top edge of headline boxes.
-- Do not use orange as a data colour: not for a bar, dot, segment, tag or any status, including in progress.
+- Do use orange for the primary action and button fills, selection, the outline of a selected box, the 3px title bars and the 2px top edge of headline boxes.
+- Do use cyan lightly: the info marks after card titles (cyan ring and letter, a cyan tint on hover and focus), the keyboard focus ring and link underlines (full cyan on hover). Nowhere else.
+- Do not use orange or cyan as a data colour: not for a bar, dot, segment, tag or any status, including in progress. Keep every data hue at least 40 degrees round the colour wheel from both accents, so a reader never takes an info mark or a title bar for data. The one exception is the bad-status rose, which may sit closer to orange because it carries only that meaning; keep it visibly pinker than the accent.
 - Do use hairline borders at rest. On dark, depth comes from surface steps and hairlines, not shadows. On light, one soft neutral shadow (about `0 1px 2px` at 8 percent).
 - Do not use hue-to-hue gradients, glows, coloured shadows, gradient text or colour washes behind content.
 
@@ -117,12 +118,14 @@ Only two status meanings are fixed. The shades are chosen per dashboard under [r
 
 ## 5. Type
 
-- Do use one family for the whole dashboard: the host's own sans family where it provides one, otherwise the system sans stack. Native controls and chart text inherit it.
-- Do not default to a monospace face.
-- Do use four sizes: caption 12px, body 14px, heading 16px, title 28px. A fifth size is a defect. Bar-list labels and doughnut keys use body, a doughnut's centre total uses title with its unit in caption, and the info mark uses caption.
-- Do use one weight (400). Hierarchy comes from size and colour. Set `b, strong` to 400 in primary colour.
+- Do use two self-hosted faces: a display face for titles (page title, section and card titles, headline box titles, drawer title) and a sans text face for everything inside cards (figures, tables, lists, legends, tooltips, buttons, filters, notes and the info mark). Serve both as font files the page loads (uploaded assets or data URLs, under an open licence such as SIL OFL), so Windows, Mac and Linux show the same faces. Native controls and chart text inherit the content face. Do not use the host's stock sans or a system stack.
+- Do choose the content face by its reading width and its figures, measured with fontTools rather than by eye: proportional letters, and tabular digits no wider than about 1.2 times its average lowercase letter. Do not use a monospace for content: every letter takes the same slot, which spaces text too widely to read comfortably at 13px. The content face is Manrope 400 (digits 0.62 em, letters 0.52 em). This is a hard rule: do not swap it.
+- Do pair the faces by proportion, measured: x-height to cap-height ratios within about 0.03 of each other, and each face scaled with `size-adjust` so their capitals stand equally tall at the same font size. A display face with short capitals makes titles look no bigger than body text. The pair is Syne 600 scaled 108% (x/cap 0.77) with Manrope 400 scaled 97% (0.75), both to a 0.70 em capital height. This is a hard rule: the measuring rules above explain why the pair works and apply only if the user asks for a new pair.
+- Do use four sizes: caption 12px, body 13px, heading 15px, title 26px. A fifth size is a defect. Bar-list labels and doughnut keys use body, a doughnut's centre total uses title with its unit in caption, and the info mark uses caption.
+- Do keep every figure at 13px or more. Tables, bar lists, legends with values, tooltips and drawer rows use body. Caption text that carries a figure or a label the reader needs uses the secondary colour, never muted.
+- Do use two weights: the display face's one weight for titles (600 for Syne) and 400 for everything else. Set `b, strong` to 400 in primary colour.
 - Do use tabular numerals for figures, set once on the wrapper.
-- Do use sentence case. Do not use uppercase, letter-spacing or italics.
+- Do use Title Case (Chicago) for the page title, section and card titles, headline box titles, table headers, buttons and the cards picker. Use sentence case for notes, keys, tooltips, info text and body copy. Do not use uppercase, letter-spacing or italics.
 
 ## 6. Bars, tables and alignment
 
@@ -132,7 +135,7 @@ Apply in the first pass. Rules and values are in [references/bars-tables.md](ref
 
 - Do lay cards on a 12-column grid. Two cards per row by default (6 + 6). A card left alone in a row spans 12. Below 900px every card spans 12.
 - Do group cards under section headings in the order a reader works through the subject, and put the headline row in the same order.
-- Do make paired cards the same height: each card wrapper is a flex column, the card takes `flex: 1`, and a card marked to fill makes its chart or list stretch (`flex: 1 1 0`, chart minimum 180px, bar-list rows `minmax(40px, 1fr)`). Charts that do not fill use 220px.
+- Do make paired cards the same height: each card wrapper is a flex column, the card takes `flex: 1`, and a card marked to fill makes its chart or list stretch (`flex: 1 1 0`, chart minimum 180px, bar-list rows `minmax(34px, 1fr)`). Charts that do not fill use 220px.
 - Do not leave more than about 15 percent of any card empty. Fix by stretching the content, moving the card next to a better partner, or changing the chart form, not by adding filler.
 - Do give doughnuts one fixed size across the page: 240 by 240px, beside a column key in a `240px 1fr` split. Two doughnuts on a page must render the same size. Stack the split below 560px.
 - Do make the headline row equal boxes, as many as the data needs (usually three to six), wrapping to fewer columns on narrower windows. Each has a title reserved to two lines, the figure, and one line of sub-text cut with an ellipsis. A small threshold ring (pass 2 colours) may sit top right. Each box is clickable and opens the list behind its figure.
@@ -149,6 +152,8 @@ No chart type is banned; forms follow [references/data-colour.md](references/dat
 - Do keep the built-in legend off. Every chart has an HTML key above it, or a clickable column key beside a doughnut showing count and percentage.
 - Do show a total in the tooltip footer of every stacked chart.
 - Do use one series colour per meaning across all charts (pass 2 status colours).
+- Do draw a count across two categories (weekday by hour, team by month) as a heatmap: one series hue as a tint from 20% to full strength, empty cells in the track tint, totals printed down the right and along the foot, and a three-step key (fewer, more, most). The quiet end of a tint scale cannot reach 3 to 1, so the printed totals carry the values; say so in the report.
+- Do colour key swatches only from an explicit series or status slot. A swatch without one, such as a tint step, keeps its own CSS colour. A script that treats a missing slot as the first colour paints it the wrong hue.
 
 ## 9. Interaction
 
@@ -157,7 +162,12 @@ No chart type is banned; forms follow [references/data-colour.md](references/dat
 - Do give each item in a drawer, list or detail one link per target. Do not repeat the same link twice in one row.
 - Do make filters tick-box dropdowns (search box, All, per-item Only, counts), one per dimension, and keep the filter bar to one line on a desktop width. Show active filters as removable chips below it.
 - Do show a refresh or loading progress bar only while it runs, and hide it a few seconds after success. Keep failures visible with what failed.
-- Do give every interactive element the hover tint, the 2px accent focus ring and the 150ms transition from the cohesion reference.
+- Do give every interactive element the hover tint, the 2px cyan focus ring and a 200ms transition (opacity, background and colour).
+- Do return focus to the mark that opened the drawer when it closes, unless the click moves on to a filter or another section.
+- Do mark section headings h2 and card titles h3. Give each info mark `role="img"` and an `aria-label` that includes its text. Add a skip link to the main table that shows on focus.
+- Do keep the page's filters in its link where the host allows, read them back on open, and say in the report if that is untested.
+- Do show one line in the bad-status colour naming any data source that failed to load, so an empty card is explained.
+- Do page long tables at about 15 rows, with Previous, Next and a page count.
 
 ## Reporting back
 
@@ -177,6 +187,5 @@ No chart type is banned; forms follow [references/data-colour.md](references/dat
 
 - Do keep them simple, and only where the dashboard already has them or the user asks. Do not add them by default.
 - Do make a hero visual one calm image or illustration from the product's world, on a quiet area of the page. Do not put it behind data, and do not use gradients or glows.
-- Do keep motion to short fades and state changes (150 to 200ms), and none when the user prefers reduced motion. Do not use looping, pulsing or attention-seeking animation.
+- Do keep motion to short fades and state changes (200ms), and none when the user prefers reduced motion. Do not add entry or scroll-reveal motion, and do not use looping, pulsing or attention-seeking animation.
 - Do not redesign the layout beyond the page structure reference and pass 7, and do not make story videos. If the user wants those, say so and suggest the original unslop.
-

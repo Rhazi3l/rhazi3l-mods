@@ -8,8 +8,8 @@ Rules for pass 6. They apply to every bar and table on the page, not only the bi
 - Do cap the name column in a bar list (name, bar, figure) at about 45% of the card and keep the bar at least about 64px. Cut long names with an ellipsis and put the full name in the hover text. An uncapped name column squeezes the bars.
 - Do give the value column a width that fits the longest value, and forbid wrapping. Anchor any marker to the left edge of the column, so it does not move with the length of the text.
 - Do round every bar with the one bar radius token (4px), on all four corners and on every segment of a stack.
-- Do use three bar thicknesses, and make every bar of each kind match: 8px for progress bars inside table cells, 24px tracks for bar lists (28px when the list stretches to fill a card), and chart bars capped by the chart library's maximum thickness (24px).
-- Do give bar lists 14px labels, rows at least 40px tall, a 45 percent name column, a 64px minimum bar and a figure box of 3ch. Rows are clickable and have no separators.
+- Do use three bar thicknesses, and make every bar of each kind match: 8px for progress bars inside table cells, 20px tracks for bar lists, and chart bars capped by the chart library's maximum thickness (24px).
+- Do give bar lists body-size (13px) labels, rows at least 34px tall, a 45 percent name column, a 64px minimum bar and a figure box of 3ch. Rows are clickable and have no separators.
 - Do make a progress cell a 56px bar plus a right-aligned figure at least 44px wide, coloured by the done-of-total rule in pass 2.
 - Do show an expanded table row's detail as a two-column grid (label 150px, then the value), with links in the value column.
 

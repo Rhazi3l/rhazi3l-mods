@@ -1,4 +1,4 @@
-# Palette: backgrounds and accent
+# Palette: backgrounds and accents
 
 Only the values in the first two tables are fixed. Do not change them per dashboard. Everything after them is a guideline. If a value changes, change this file only.
 
@@ -9,7 +9,8 @@ Only the values in the first two tables are fixed. Do not change them per dashbo
 | Page | `#151618` | `#e8eaee` |
 | Card | `#202225` | `#f5f6f8` |
 | Border | `#303338` | `#d3d8e0` |
-| Accent (burnt orange) | `#d4743c` | `#af5926` |
+| Accent (orange, Chilean Fire) | `#f86906` | `#bd5005` |
+| Second accent (cyan: info marks, focus ring, link underlines) | `#32dbff` | `#00779e` |
 
 The dark ramp has only a faint cool tint, between plain charcoal and a blue-tinted theme. The light card is a soft off-white and never pure white, because pure white is too bright. Check data colours against this card, not against white, since they lose about 0.5 of contrast. Borders are 1px hairlines.
 
@@ -17,7 +18,7 @@ The dark ramp has only a faint cool tint, between plain charcoal and a blue-tint
 
 - Text has three neutral roles, with the same faint tint as the surfaces. Primary is at least 10 to 1 on the card, secondary about 7 to 1, and muted at least 5 to 1. Choose the shades to meet these, in each mode.
 - The selected tint is the accent at 20 percent over the card. The hover and bar-track tint is the primary text colour at about 8 percent, so it stays neutral. Work these out per mode.
-- Text on an orange fill is dark in dark mode and white in light mode (about 4.9 to 1 on `#af5926`).
-- Accent used as text needs 4.5 to 1 on the card. The plain `#d4743c` as text on light is about 3.1, so light mode uses `#af5926`.
+- Text on an orange fill is dark in dark mode and white in light mode (about 4.5 to 1 on `#bd5005`).
+- An accent used as text needs 4.5 to 1 on the card. On light, `#f86906` is about 2.8 and `#32dbff` about 1.5, so light mode uses `#bd5005` (4.5) and `#00779e` (4.7). Define the cyan as a CSS variable per mode in the page, not as a chart colour slot.
 - Check every pair with a script, not by eye, and list any text and background pair below 4.5 to 1 in the report.
 - Do not use a fixed data palette. Data colours follow [data-colour.md](data-colour.md).

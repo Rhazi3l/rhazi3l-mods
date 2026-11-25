@@ -6,8 +6,8 @@ Define each of these once, as a variable, and use it everywhere. Do not write th
 
 | Token | Used by | Rule |
 |---|---|---|
-| Row height | table rows, legend rows, list rows, buttons, inputs, selects, dropdown rows | one value (28px). Only wrapping text rows grow. Bar-list rows are at least 40px |
-| Bar thickness | progress bars in table cells, bar-list tracks, chart bars | three values (8px, 24px, chart maximum 24px), one per kind. A headline segmented bar may be larger, and is named in the report |
+| Row height | table rows, legend rows, list rows, buttons, inputs, selects, dropdown rows | one value (28px). Only wrapping text rows grow. Bar-list rows are at least 34px |
+| Bar thickness | progress bars in table cells, bar-list tracks, chart bars | three values (8px, 20px, chart maximum 24px), one per kind. A headline segmented bar may be larger, and is named in the report |
 | Bar radius | every bar, fill and track | one value (4px) |
 | Track tint | every bar track | the same faint neutral (text at about 8 percent) |
 | Marker size and radius | status dots, series squares, legend and key squares, the marker beside a figure | one size (12px), one radius (3px) |
@@ -33,10 +33,10 @@ Run it after the passes, in this order.
 Count from the code, for example by listing every distinct `font-size`, `font-weight`, `color`, `opacity` and literal colour with `grep`. The count should match the scale below.
 
 Type
-- Do set one family once on the page wrapper. No panel sets its own.
-- Do use four sizes (12, 14, 16 and 28px): caption (12px: tables, lists, notes, controls, legends, chips, the sub-text under a figure, and the info mark), body (14px: running text, the lead line, bar-list labels and doughnut keys), heading (every title: section titles and titles of headline boxes), title (28px: page title, headline figures, and a doughnut's centre total). A fifth size is a defect.
-- Do make all titles one size, one colour (primary) and one weight. A small box title beside large section titles is a defect.
-- Do use one weight (400), tabular figures, and no uppercase, letter-spacing or italics.
+- Do set the content face once on the page wrapper and the display face once on the title classes. No panel sets its own.
+- Do use four sizes (12, 13, 15 and 26px): caption (12px: notes, controls, chips, keys, table headers and the info mark), body (13px: tables, lists, legends with values, tooltips, drawer rows, the sub-text under a figure, bar-list labels and doughnut keys), heading (15px, every title: section titles and titles of headline boxes), title (26px: page title, headline figures, and a doughnut's centre total). A fifth size is a defect.
+- Do make all titles one face, one size, one colour (primary) and one weight. A small box title beside large section titles is a defect.
+- Do use two weights (the display face's one weight for titles, 400 for everything else), tabular figures, and no uppercase, letter-spacing or italics.
 
 Text colour
 - Do use three roles, by meaning and the same in every panel: primary for names, figures, values and titles, secondary for supporting text and links, muted for small labels, notes and sub-text.
@@ -49,11 +49,11 @@ Data colour map
 
 States
 - Do use one faded opacity token for disabled and filtered-out items.
-- Do use one hover tint, one selected tint and one focus ring (2px accent, 1px offset) on everything interactive, including selects, segmented buttons and the theme button. A 1px ring is too faint on a light page.
+- Do use one hover tint, one selected tint and one focus ring (2px cyan, 1px offset) on everything interactive, including selects, segmented buttons and the theme button. A 1px ring is too faint on a light page.
 - Do use a 1px inset accent outline with the selected tint for a selected row or legend item inside a list. A 2px outline looks heavy on tight rows.
 - Do check that the host's own focus style on selects and inputs does not add a second ring.
 - Do use one transition (opacity, background and colour, same duration and easing) on every button and link, and none when the user prefers reduced motion.
 - A loading or refreshing state may use its own value, which the report names.
 
 Copy
-- Do use the same separator in meta lines everywhere (a middle dot with spaces), one format for dates and units, and sentence case in every heading, label and button.
+- Do use the same separator in meta lines everywhere (a middle dot with spaces), one format for dates and units, Title Case (Chicago) for titles, table headers, buttons and the cards picker, and sentence case for notes, keys, tooltips and body copy.
