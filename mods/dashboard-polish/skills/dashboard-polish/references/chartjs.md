@@ -23,7 +23,7 @@ const bar = (label, data, color, extra) => ({ label, data, backgroundColor: colo
 
 // Doughnut: rounded segments split by a card-coloured gap, total in the centre.
 { data: values, backgroundColor: colours, borderWidth: 2, borderColor: cssVar('--card'), borderRadius: 6 }
-options: { ...base, cutout: '62%' }   // centre: total at title size (26px) primary, unit at caption size (12px) muted
+options: { ...base, cutout: '62%' }   // centre: total at title size (26px) primary, unit at body size (13px) muted
 ```
 
 - Round every bar segment, stacked or not, with the object radius above, and separate stacked segments with a 1px card-coloured border.

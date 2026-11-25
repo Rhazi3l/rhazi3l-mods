@@ -34,7 +34,7 @@ Count from the code, for example by listing every distinct `font-size`, `font-we
 
 Type
 - Do set the content face once on the page wrapper and the display face once on the title classes. No panel sets its own.
-- Do use four sizes (12, 13, 15 and 26px): caption (12px: notes, controls, chips, keys, table headers and the info mark), body (13px: tables, lists, legends with values, tooltips, drawer rows, the sub-text under a figure, bar-list labels and doughnut keys), heading (15px, every title: section titles and titles of headline boxes), title (26px: page title, headline figures, and a doughnut's centre total). A fifth size is a defect.
+- Do use three sizes (13, 15 and 26px): body (13px: notes, controls, chips, keys, table headers, the info mark, tables, lists, legends with values, tooltips, drawer rows, the sub-text under a figure, bar-list labels and doughnut keys; quieter roles take the secondary or muted colour, not a smaller size), heading (15px, every title: section titles and titles of headline boxes), title (26px: page title, headline figures, and a doughnut's centre total). A fourth size is a defect.
 - Do make all titles one face, one size, one colour (primary) and one weight. A small box title beside large section titles is a defect.
 - Do use two weights (the display face's one weight for titles, 400 for everything else), tabular figures, and no uppercase, letter-spacing or italics.
 

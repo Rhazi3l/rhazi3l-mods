@@ -16,18 +16,28 @@ Run it on a dashboard that already has a dashboard-polish baseline, or let Stage
 The dashboard-polish skill is the brief. Its fixed rules are locked for every later stage:
 
 - Palette: the fixed page, card and border values and the orange and cyan accents from dashboard-polish's palette reference, neither accent ever a data colour, the green and rose status meanings.
-- Type: the Syne and Manrope pair, the four sizes, the two weights and the case rules exactly as dashboard-polish pass 5 sets them. Read the values there; this file does not repeat them, so the two skills cannot drift apart.
+- Type: the Syne and Manrope pair, the three sizes, the two weights and the case rules exactly as dashboard-polish pass 5 sets them. Read the values there; this file does not repeat them, so the two skills cannot drift apart.
 - Spacing tokens, 12-column card grid, equal-height paired cards, doughnut size.
 - Chart rules, HTML keys, side-drawer drill-downs, tick-box filters.
 - Dark and light modes, dark by default. British English, metric, 24-hour time, DD/MM/YYYY, GBP.
 
 Precedence when skills disagree:
 
-1. Accessibility and contrast (4.5 to 1 text, 3 to 1 marks) beat everything, including a locked rule. If a locked rule fails contrast, keep the rule's intent, fix the value, and name it in the report.
-2. Locked dashboard-polish rules beat any other skill's styling advice. Drop a suggestion that would change them (a new font, extra weights, a gradient, a new accent, uppercase labels, extra sizes) and list it in the report as "declined, conflicts with dashboard-polish".
-3. Other skills decide everything the locked rules leave open: data hues, chart choice, UX flow, hierarchy within the four sizes, states, empty and error handling, keyboard and focus behaviour, copy clarity.
+1. Accessibility and contrast (4.5 to 1 text, 3 to 1 marks) beat everything else. If a locked value fails contrast, do not change it: propose a fix (see Locked values) and flag it at the top of the report.
+2. Locked dashboard-polish rules beat any other skill's styling advice. A suggestion that would change one (a new font, extra weights, a gradient, a new accent, uppercase labels, extra sizes) is never applied by a stage, but it is kept as a proposal (see Locked values).
+3. Other skills decide everything the locked rules leave open: data hues, chart choice, UX flow, hierarchy within the three sizes, states, empty and error handling, keyboard and focus behaviour, copy clarity.
 
-Readability rule for every stage: figures and the 12px caption text must stay highly readable. Captions use secondary text colour at minimum (never muted) when they carry a figure or a label a reader needs, and no figure goes below dashboard-polish's body size.
+Readability rule for every stage: figures and small-role text must stay highly readable. Small-role text uses secondary text colour at minimum (never muted) when they carry a figure or a label a reader needs, and no figure goes below dashboard-polish's body size.
+
+## Locked values
+
+Every skill may suggest a change to a locked value (accents, surfaces, fonts, sizes, weights, case, spacing tokens, motion). No stage applies one. Before fixing any finding in any stage, check it against dashboard-polish's palette reference and pass 5; if it touches a locked value, leave the dashboard as it is and log it as a proposal with:
+
+- what it would change, from and to;
+- which skill raised it and why;
+- how to test it (for example, a contrast figure to measure, or a before and after screenshot in both modes).
+
+Proposals go first in the report. Apply one only after the user approves it, and then as a change to dashboard-polish itself, so the rule and the dashboard stay in step.
 
 ## Stage 0. Load the brief
 
@@ -50,7 +60,7 @@ Apply it: build or restyle the dashboard using dashboard-polish passes 1 to 9 in
 
 ## Stage 3. Critique, fix, polish (impeccable)
 
-Load `impeccable` with `critique` and the dashboard as target. Treat this as refinement, not redesign: keep the established world. Fix every finding that does not conflict with a locked rule. Render again.
+Load `impeccable` with `critique` and the dashboard as target. Treat this as refinement, not redesign: keep the established world. Fix every finding that does not touch a locked value; log the rest as proposals. Render again.
 
 If impeccable's launcher would download and run a binary, do not run it. Say so, work from its written playbooks, and mark the critique as a degraded single-context run.
 
@@ -64,14 +74,14 @@ Load `web-design-guidelines` with the dashboard files. It reports findings as `f
 - Medium: degrades use (missing states, poor targets, unclear copy, layout shift, slow or janky interaction).
 - Low: preference or minor consistency.
 
-Fix all high and medium findings that do not conflict with a locked rule. List low findings in the report without fixing them.
+Fix all high and medium findings that do not touch a locked value; log the rest as proposals. List low findings in the report without fixing them.
 
 ## Stage 5. Check and report
 
 Run the dashboard-polish sweep (references/cohesion.md) and every check under its "Reporting back", because stages 3 and 4 can drift from the brief. Fix what drifted. Then report in one message:
 
+- Proposals to change locked values, each with from and to, source skill, reason and how to test.
 - Per stage: what changed, in a few lines.
-- Declined suggestions and the locked rule each conflicted with.
 - Low guidelines findings left open.
 - Contrast check result, both modes.
 - Knock-on effects with fixes, and what the changes cost.

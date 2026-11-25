@@ -121,8 +121,8 @@ Only two status meanings are fixed. The shades are chosen per dashboard under [r
 - Do use two self-hosted faces: a display face for titles (page title, section and card titles, headline box titles, drawer title) and a sans text face for everything inside cards (figures, tables, lists, legends, tooltips, buttons, filters, notes and the info mark). Serve both as font files the page loads (uploaded assets or data URLs, under an open licence such as SIL OFL), so Windows, Mac and Linux show the same faces. Native controls and chart text inherit the content face. Do not use the host's stock sans or a system stack.
 - Do choose the content face by its reading width and its figures, measured with fontTools rather than by eye: proportional letters, and tabular digits no wider than about 1.2 times its average lowercase letter. Do not use a monospace for content: every letter takes the same slot, which spaces text too widely to read comfortably at 13px. The content face is Manrope 400 (digits 0.62 em, letters 0.52 em). This is a hard rule: do not swap it.
 - Do pair the faces by proportion, measured: x-height to cap-height ratios within about 0.03 of each other, and each face scaled with `size-adjust` so their capitals stand equally tall at the same font size. A display face with short capitals makes titles look no bigger than body text. The pair is Syne 600 scaled 108% (x/cap 0.77) with Manrope 400 scaled 97% (0.75), both to a 0.70 em capital height. This is a hard rule: the measuring rules above explain why the pair works and apply only if the user asks for a new pair.
-- Do use four sizes: caption 12px, body 13px, heading 15px, title 26px. A fifth size is a defect. Bar-list labels and doughnut keys use body, a doughnut's centre total uses title with its unit in caption, and the info mark uses caption.
-- Do keep every figure at 13px or more. Tables, bar lists, legends with values, tooltips and drawer rows use body. Caption text that carries a figure or a label the reader needs uses the secondary colour, never muted.
+- Do use three sizes: body 13px, heading 15px, title 26px. A fourth size is a defect. Notes, keys, chips, table headers and the info mark use body in the secondary or muted colour; hierarchy below a title comes from colour, not a smaller size. A doughnut's centre total uses title with its unit in body.
+- Do keep every figure at 13px or more. Tables, bar lists, legends with values, tooltips and drawer rows use body. Small-role text (notes, keys, table headers) that carries a figure or a label the reader needs uses the secondary colour, never muted.
 - Do use two weights: the display face's one weight for titles (600 for Syne) and 400 for everything else. Set `b, strong` to 400 in primary colour.
 - Do use tabular numerals for figures, set once on the wrapper.
 - Do use Title Case (Chicago) for the page title, section and card titles, headline box titles, table headers, buttons and the cards picker. Use sentence case for notes, keys, tooltips, info text and body copy. Do not use uppercase, letter-spacing or italics.
@@ -177,7 +177,7 @@ No chart type is banned; forms follow [references/data-colour.md](references/dat
   - Paired cards are the same height, and no card is more than about 15 percent empty. In the console: for each visible `.card`, compare the summed height of its children with its inner height.
   - Clicking any mark opens the drawer and no card changes size.
   - Every bar corner is rounded, no axis shows tick stubs, and both doughnuts (if any) are the same size.
-  - The distinct `font-size` values in the code are the four sizes.
+  - The distinct `font-size` values in the code are the three sizes.
   - Every note fits one line at 1280px.
 - Do name any colour that could not be changed and the reason, such as a colour shared by two meanings.
 - Do list the knock-on effects of each change, such as other panels that share a style, each with its fix.
