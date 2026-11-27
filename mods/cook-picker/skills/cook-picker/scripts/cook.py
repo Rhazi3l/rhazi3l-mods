@@ -59,7 +59,8 @@ def num(text):
 
 
 def term_regex(term):
-    return re.compile(rf"\b{re.escape(term)}(e?s)?\b", re.I)
+    stem = re.escape(term[:-1]) + "(y|ies)" if term.endswith("y") else re.escape(term) + "(e?s)?"
+    return re.compile(rf"\b{stem}\b", re.I)
 
 
 def has(term, text):
@@ -199,20 +200,24 @@ def combine(a, b):
     return {k: round(a.get(k, 0) + b.get(k, 0), 2) for k in set(a) | set(b)}
 
 
-def pair_sides(rows, sides):
-    """Attach the side that lowers a main's penalty most, if it beats minImprovement. Ranking then uses
-    the paired figures, so a main that misses fibre can rise once greens are added."""
-    gain = PREFS["sides"]["minImprovement"]
-    for r in rows:
+def pair_sides(pool, sides):
+    """Pair a side only where it lifts a main from outside the top 10 into it. Mains already in the
+    top 10 by themselves stay unpaired. The side must also lower the penalty by sides.minImprovement."""
+    gain, n = PREFS["sides"]["minImprovement"], PREFS["shortlist"]["detail"]
+    alone = sorted(pool, key=lambda r: (r["penalty"], -r["n"]["protein"]))
+    for r in pool:
         r["side"], r["mainOnly"] = None, {"n": r["n"], "penalty": r["penalty"]}
+    if len(alone) <= n:
+        return
+    bar = alone[n - 1]["penalty"]
+    for r in alone[n:]:
         best = None
         for s in sides:
-            if not fits(s, r):
-                continue
-            p = penalty({**r, "n": combine(r["n"], s["n"])})
-            if best is None or p < best[0]:
-                best = (p, s)
-        if best and r["penalty"] - best[0] >= gain:
+            if fits(s, r):
+                p = penalty({**r, "n": combine(r["n"], s["n"])})
+                if best is None or p < best[0]:
+                    best = (p, s)
+        if best and best[0] < bar and r["penalty"] - best[0] >= gain:
             s = best[1]
             r["side"] = {k: s[k] for k in ("title", "how", "pricePP", "url", "n")}
             r["n"], r["penalty"] = combine(r["n"], s["n"]), best[0]
@@ -350,13 +355,14 @@ def nut_cells(r):
 def load(refresh, with_sides=True):
     rows, skipped = enrich(catalogue(refresh), refresh)
     for r in rows:
-        r["penalty"] = penalty(r)
-    if with_sides:
-        pair_sides(rows, side_catalogue(refresh))
+        r["penalty"], r["side"] = penalty(r), None
     ranked = score_all(rows)
     dropped = [r for r in ranked if r["flags"]["drop"]]
     excluded = [r for r in ranked if r["kind"] in PREFS["exclude"]["proteinTypes"]]
     pool = [r for r in ranked if r not in dropped and r not in excluded]
+    if with_sides:
+        pair_sides(pool, side_catalogue(refresh))
+        pool = score_all(pool)
     return ranked, pool, dropped, excluded, skipped
 
 
@@ -383,7 +389,7 @@ def cmd_pick(args):
           [[i + 1, r["title"], r["side"]["title"] if r["side"] else "-", r["kind"], r["penalty"], *nut_cells(r),
             f"{r['pricePP']:.2f}", r["how"] + (f" + {r['side']['how']}" if r["side"] else "")]
            for i, r in enumerate(top)])
-    paired = [r for r in detail if r["side"]]
+    paired = [r for r in detail if r.get("side")]
     if paired:
         print("\n## Why these sides\n")
         table(["Meal", "Side", "Main alone misses", "With side misses", "Side adds"],

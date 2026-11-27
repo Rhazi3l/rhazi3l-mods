@@ -19,11 +19,11 @@ Let `DIR` be the folder holding this SKILL.md. Outputs go to `~/.local/share/coo
 ## Rules
 
 - Feeding two: each meal is either one Serves 2 pack or two Serves 1 packs, whichever scores better on the targets (cheaper on a tie). Serves 1 packs widen the choice, since many dishes come only in that size.
-- Sides: each main is tried with every side from the sides page (Serves 1 or 2 packs; gravies, sauces, trimmings and meaty starters left out). The best side is paired only if it lowers the penalty by `sides.minImprovement`, so most mains stay unpaired. Pairing figures, price and ingredient flags then include the side, and ranking uses them. The "Why these sides" table shows what each side fixes.
+- Sides: each main is tried with every side from the sides page (Serves 1 or 2 packs; gravies, sauces, trimmings and meaty starters left out). A side is paired only when it lifts a main from outside the top 10 into it (and lowers its penalty by `sides.minImprovement`). Mains already in the top 10 by themselves never get a side. Pairing figures, price and ingredient flags then include the side, and ranking uses them. The "Why these sides" table shows what each side fixes.
 - Sides must suit the dish: Indian sides (naan, dhal, saag...) only with Indian mains, Asian sides (spring rolls, soy greens...) only with Thai and pan-Asian mains, plain rice with either, everything else only with the remaining mains. A starchy side is never added to a main that already has rice, pasta, potato, couscous or pastry.
 - `stats` judges mains alone, without sides.
 - If fibre is still the only miss, say a home vegetable side would cover it.
-- Prawn is the only hard drop. Flag terms, additives and processed meat are flag-only.
+- Prawn and cranberry are hard drops (cranberry: the user's partner dislikes it), for mains and sides alike. Flag terms, additives and processed meat are flag-only.
 - The bloating watchlist only highlights. It never filters or re-ranks.
 - Chilli level is a soft penalty. The proposed 4 has at most 2 dishes of one protein, and fish only wins close calls.
 - COOK publishes no cook time, so there is no speed penalty.

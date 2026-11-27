@@ -79,8 +79,10 @@
   },
   "hardDrop": {
     "ingredientTerms": [
-      "prawn"
-    ]
+      "prawn",
+      "cranberry"
+    ],
+    "note": "[user-set] cranberry: partner dislikes it. Applies to mains and sides, by title and ingredients"
   },
   "flagOnly": {
     "terms": [
@@ -207,7 +209,7 @@
     "enabled": true,
     "source": "sides",
     "minImprovement": 0.3,
-    "minImprovement_note": "[assumed] a side is paired only if it lowers the meal's penalty by at least this much, so most mains stay unpaired",
+    "minImprovement_note": "[assumed] the side must also lower the meal's penalty by at least this much",
     "excludeTitlePattern": "gravy|sauce|stuffing|blankets|wings|katsu bites|fishcakes|samosas|parcels",
     "excludeTitlePattern_note": "[assumed] gravies, sauces, Christmas trimmings and meaty starters are not complements",
     "cuisine": {
@@ -245,6 +247,7 @@
       "ciabatta"
     ],
     "mainStarchPattern": "rice|biryani|noodle|ramen|pasta|spaghetti|lasagne|linguine|potato|mash|couscous|pie|hotpot|gnocchi|risotto|dauphinoise",
-    "starch_note": "a starchy side is not paired with a main that already has a starch in its title"
+    "starch_note": "a starchy side is not paired with a main that already has a starch in its title",
+    "pairing": "only to lift a main from outside the top 10 into it; mains already in the top 10 by themselves stay unpaired"
   }
 }

@@ -67,18 +67,23 @@ class Sides(unittest.TestCase):
         self.assertTrue(cook.fits(self.side("Trio of Greens"), {"title": "Lamb Casserole", "cuisine": None}))
         self.assertFalse(cook.fits(self.side("Trio of Greens"), {"title": "Green Thai Curry", "cuisine": "asian"}))
 
-    def test_pairing_only_when_it_helps(self):
-        main = {"title": "Lamb Casserole", "cuisine": None, "chilli": 0, "ingredients": "", "pricePP": 6,
-                "n": {"kcal": 300, "protein": 32, "sat": 2, "salt": 1.5, "fibre": 4, "sugar": 3}}
-        good = {"title": "Trio of Greens", "cuisine": set(), "how": "", "pricePP": 2, "url": "", "ingredients": "",
-                "n": {"kcal": 60, "protein": 3, "sat": 0.2, "salt": 0.1, "fibre": 4, "sugar": 2}}
-        full = {**main, "n": {**main["n"], "fibre": 8}}
-        for r in (main, full):
+    def test_side_only_lifts_mains_into_top_10(self):
+        def main(title, fibre):
+            r = {"title": title, "cuisine": None, "chilli": 0, "ingredients": "", "pricePP": 6,
+                 "n": {"kcal": 300, "protein": 32, "sat": 2, "salt": 1.5, "fibre": fibre, "sugar": 3}}
             r["penalty"] = cook.penalty(r)
-        cook.pair_sides([main, full], [good])
-        self.assertEqual(main["side"]["title"], "Trio of Greens")
-        self.assertIsNone(full["side"])
+            return r
+        greens = {"title": "Trio of Greens", "cuisine": set(), "how": "", "pricePP": 2, "url": "", "ingredients": "",
+                  "n": {"kcal": 60, "protein": 3, "sat": 0.2, "salt": 0.1, "fibre": 4, "sugar": 2}}
+        top = [main(f"Stew {i}", 6.5) for i in range(10)]
+        low = main("Lamb Casserole", 4)
+        cook.pair_sides(top + [low], [greens])
+        self.assertEqual(low["side"]["title"], "Trio of Greens")
+        self.assertTrue(all(r["side"] is None for r in top))
 
+    def test_cranberry_is_dropped(self):
+        r = {"title": "Turkey Crown", "ingredients": "Turkey, Cranberries (5%)"}
+        self.assertIn("cranberry", cook.flags(r)["drop"])
 
 if __name__ == "__main__":
     unittest.main()
