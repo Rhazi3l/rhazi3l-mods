@@ -201,23 +201,18 @@ def combine(a, b):
 
 
 def pair_sides(pool, sides):
-    """Pair a side only where it lifts a main from outside the top 10 into it. Mains already in the
-    top 10 by themselves stay unpaired. The side must also lower the penalty by sides.minImprovement."""
-    gain, n = PREFS["sides"]["minImprovement"], PREFS["shortlist"]["detail"]
-    alone = sorted(pool, key=lambda r: (r["penalty"], -r["n"]["protein"]))
+    """Each main competes in its better form: alone, or with the side that lowers its penalty most
+    (by at least sides.minImprovement). Ranking then decides which pairs reach the top 10."""
+    gain = PREFS["sides"]["minImprovement"]
     for r in pool:
         r["side"], r["mainOnly"] = None, {"n": r["n"], "penalty": r["penalty"]}
-    if len(alone) <= n:
-        return
-    bar = alone[n - 1]["penalty"]
-    for r in alone[n:]:
         best = None
         for s in sides:
             if fits(s, r):
                 p = penalty({**r, "n": combine(r["n"], s["n"])})
                 if best is None or p < best[0]:
                     best = (p, s)
-        if best and best[0] < bar and r["penalty"] - best[0] >= gain:
+        if best and r["penalty"] - best[0] >= gain:
             s = best[1]
             r["side"] = {k: s[k] for k in ("title", "how", "pricePP", "url", "n")}
             r["n"], r["penalty"] = combine(r["n"], s["n"]), best[0]

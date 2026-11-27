@@ -1,6 +1,6 @@
 {
   "name": "cook-picker",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Shortlists COOK (cookfood.net) main meals for two against your nutrition targets: top 20, a top 10 with flags, and a proposed 4. Run it with /cook-picker.",
   "author": {
     "name": "Rhazi3l"

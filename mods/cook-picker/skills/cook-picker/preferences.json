@@ -248,6 +248,6 @@
     ],
     "mainStarchPattern": "rice|biryani|noodle|ramen|pasta|spaghetti|lasagne|linguine|potato|mash|couscous|pie|hotpot|gnocchi|risotto|dauphinoise",
     "starch_note": "a starchy side is not paired with a main that already has a starch in its title",
-    "pairing": "only to lift a main from outside the top 10 into it; mains already in the top 10 by themselves stay unpaired"
+    "pairing": "[user-set] every main competes in its better form, alone or with its best side; whatever ranks in the top 10 is shown with its side"
   }
 }

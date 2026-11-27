@@ -67,19 +67,19 @@ class Sides(unittest.TestCase):
         self.assertTrue(cook.fits(self.side("Trio of Greens"), {"title": "Lamb Casserole", "cuisine": None}))
         self.assertFalse(cook.fits(self.side("Trio of Greens"), {"title": "Green Thai Curry", "cuisine": "asian"}))
 
-    def test_side_only_lifts_mains_into_top_10(self):
-        def main(title, fibre):
+    def test_side_kept_only_when_it_improves(self):
+        def main(title, fibre, sat=2):
             r = {"title": title, "cuisine": None, "chilli": 0, "ingredients": "", "pricePP": 6,
-                 "n": {"kcal": 300, "protein": 32, "sat": 2, "salt": 1.5, "fibre": fibre, "sugar": 3}}
+                 "n": {"kcal": 300, "protein": 32, "sat": sat, "salt": 1.5, "fibre": fibre, "sugar": 3}}
             r["penalty"] = cook.penalty(r)
             return r
         greens = {"title": "Trio of Greens", "cuisine": set(), "how": "", "pricePP": 2, "url": "", "ingredients": "",
-                  "n": {"kcal": 60, "protein": 3, "sat": 0.2, "salt": 0.1, "fibre": 4, "sugar": 2}}
-        top = [main(f"Stew {i}", 6.5) for i in range(10)]
-        low = main("Lamb Casserole", 4)
-        cook.pair_sides(top + [low], [greens])
+                  "n": {"kcal": 60, "protein": 3, "sat": 0.9, "salt": 0.1, "fibre": 4, "sugar": 2}}
+        low, full, fatty = main("Lamb Casserole", 4), main("Stew", 8), main("Pie", 6.5, sat=2.9)
+        cook.pair_sides([low, full, fatty], [greens])
         self.assertEqual(low["side"]["title"], "Trio of Greens")
-        self.assertTrue(all(r["side"] is None for r in top))
+        self.assertIsNone(full["side"])
+        self.assertIsNone(fatty["side"])
 
     def test_cranberry_is_dropped(self):
         r = {"title": "Turkey Crown", "ingredients": "Turkey, Cranberries (5%)"}
