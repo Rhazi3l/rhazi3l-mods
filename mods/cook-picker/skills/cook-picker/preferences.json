@@ -35,7 +35,19 @@
       "meals-for-1",
       "meals-for-2"
     ],
-    "extraSources_note": "pages listed by pack size; their meals get a protein type from the categories above, else from the title"
+    "extraSources_note": "pages listed by pack size; their meals get a protein type from the categories above, else from the title",
+    "cuisineCategories": {
+      "indian": [
+        "indian",
+        "indian-takeaway-for-2"
+      ],
+      "asian": [
+        "thai",
+        "pan-asian-meals",
+        "thai-takeaway-for-2"
+      ]
+    },
+    "cuisineCategories_note": "tags mains by cuisine so sides are only paired where they fit"
   },
   "targetsPerPortion": {
     "satFatG": {
@@ -62,8 +74,8 @@
       "vegetarian"
     ],
     "proteinTypes_note": "[assumed] copied from gousto-picker, which skips vegetarian; remove to include them",
-    "titlePattern": "\\bkids?\\b",
-    "titlePattern_note": "kids' meals sit in the protein categories too"
+    "titlePattern": "\\bkids?\\b|\\bwings\\b",
+    "titlePattern_note": "kids' meals and wings sit in the protein categories too"
   },
   "hardDrop": {
     "ingredientTerms": [
@@ -190,5 +202,49 @@
     "sugar": 1,
     "hotPerChilli": 0.25,
     "note": "[assumed] penalty = each target miss as a fraction of its limit x its weight, plus hotPerChilli x chilli level. Lower ranks higher. Same formula as gousto-picker stage 2 without cook time, which COOK does not publish. Nutrition is for the main only: a side (rice, greens) adds fibre and kcal"
+  },
+  "sides": {
+    "enabled": true,
+    "source": "sides",
+    "minImprovement": 0.3,
+    "minImprovement_note": "[assumed] a side is paired only if it lowers the meal's penalty by at least this much, so most mains stay unpaired",
+    "excludeTitlePattern": "gravy|sauce|stuffing|blankets|wings|katsu bites|fishcakes|samosas|parcels",
+    "excludeTitlePattern_note": "[assumed] gravies, sauces, Christmas trimmings and meaty starters are not complements",
+    "cuisine": {
+      "indian": [
+        "naan",
+        "bhaji",
+        "saag",
+        "dhal",
+        "aloo gobi",
+        "bombay",
+        "gunpowder",
+        "pilau",
+        "plain basmati rice"
+      ],
+      "asian": [
+        "spring roll",
+        "egg fried rice",
+        "coconut",
+        "soy garlic",
+        "edamame",
+        "corn fritter",
+        "plain basmati rice"
+      ]
+    },
+    "cuisine_note": "a side matching a cuisine's terms pairs only with mains of that cuisine (rice is in both); all other sides pair only with mains that are neither indian nor asian",
+    "starchTerms": [
+      "rice",
+      "couscous",
+      "mash",
+      "potato",
+      "potatoes",
+      "dauphinoise",
+      "naan",
+      "pilau",
+      "ciabatta"
+    ],
+    "mainStarchPattern": "rice|biryani|noodle|ramen|pasta|spaghetti|lasagne|linguine|potato|mash|couscous|pie|hotpot|gnocchi|risotto|dauphinoise",
+    "starch_note": "a starchy side is not paired with a main that already has a starch in its title"
   }
 }

@@ -49,5 +49,36 @@ class Plan(unittest.TestCase):
         self.assertEqual(cook.penalty(r), 0)
 
 
+class Sides(unittest.TestCase):
+    def side(self, title):
+        return {"title": title, "cuisine": cook.side_cuisine(title)}
+
+    def test_rice_not_added_to_biryani(self):
+        self.assertFalse(cook.fits(self.side("Plain Basmati Rice"), {"title": "Chicken Biryani", "cuisine": "indian"}))
+
+    def test_rice_with_curry_not_hotpot(self):
+        self.assertTrue(cook.fits(self.side("Plain Basmati Rice"), {"title": "Chicken Balti", "cuisine": "indian"}))
+        self.assertFalse(cook.fits(self.side("Plain Basmati Rice"), {"title": "Beef Stew", "cuisine": None}))
+
+    def test_naan_only_with_indian(self):
+        self.assertFalse(cook.fits(self.side("Plain Naan"), {"title": "Beef Bourguignon", "cuisine": None}))
+
+    def test_greens_with_british_not_thai(self):
+        self.assertTrue(cook.fits(self.side("Trio of Greens"), {"title": "Lamb Casserole", "cuisine": None}))
+        self.assertFalse(cook.fits(self.side("Trio of Greens"), {"title": "Green Thai Curry", "cuisine": "asian"}))
+
+    def test_pairing_only_when_it_helps(self):
+        main = {"title": "Lamb Casserole", "cuisine": None, "chilli": 0, "ingredients": "", "pricePP": 6,
+                "n": {"kcal": 300, "protein": 32, "sat": 2, "salt": 1.5, "fibre": 4, "sugar": 3}}
+        good = {"title": "Trio of Greens", "cuisine": set(), "how": "", "pricePP": 2, "url": "", "ingredients": "",
+                "n": {"kcal": 60, "protein": 3, "sat": 0.2, "salt": 0.1, "fibre": 4, "sugar": 2}}
+        full = {**main, "n": {**main["n"], "fibre": 8}}
+        for r in (main, full):
+            r["penalty"] = cook.penalty(r)
+        cook.pair_sides([main, full], [good])
+        self.assertEqual(main["side"]["title"], "Trio of Greens")
+        self.assertIsNone(full["side"])
+
+
 if __name__ == "__main__":
     unittest.main()

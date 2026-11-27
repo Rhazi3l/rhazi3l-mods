@@ -145,7 +145,79 @@ def catalogue(refresh):
                 it["kinds"].append(kind)
     if not items:
         sys.exit("No products found: COOK may have changed its menu pages.")
+    for cuisine, slugs in CAT.get("cuisineCategories", {}).items():
+        for slug in slugs:
+            for p in category_products(cached("cat-" + slug, f"{SITE}/menu/main-meals/{slug}", refresh)):
+                if p["productId"] in items:
+                    items[p["productId"]]["cuisine"] = cuisine
     return list(items.values())
+
+
+def side_catalogue(refresh):
+    """Sides sold as Serves 1 or 2, with nutrition per portion for the household."""
+    cfg = PREFS.get("sides", {})
+    if not cfg.get("enabled"):
+        return []
+    page = cached("cat-" + cfg["source"], f"{SITE}/menu/main-meals/{cfg['source']}", refresh)
+    out = []
+    for p in category_products(page):
+        title = clean(p["title"])
+        if re.search(cfg["excludeTitlePattern"], title, re.I) or not p.get("available", True):
+            continue
+        it = {"title": title, "slug": p["link"],
+              "packs": {serves(s["servesText"]): {"price": s["price"], "buyable": s.get("allowAddToBasket", True)}
+                        for s in p.get("servings", []) if serves(s.get("servesText"))}}
+        opts = pack_options(it)
+        if not opts:
+            continue
+        detail = parse_product(cached("p-" + it["slug"], f"{SITE}/products/{it['slug']}", refresh))
+        size, how, pp = min(opts, key=lambda o: o[2])
+        nut = for_size(detail["nutrition"], size)
+        ingr = for_size(detail["ingredients"], size) or ""
+        if not nut or "kcal" not in nut or any(has(t, ingr + " " + title) for t in PREFS["hardDrop"]["ingredientTerms"]):
+            continue
+        out.append({**it, "how": how, "pricePP": round(pp, 2), "n": nut, "ingredients": ingr,
+                    "cuisine": side_cuisine(title), "url": f"{SITE}/products/{it['slug']}"})
+    return out
+
+
+def side_cuisine(title):
+    return {c for c, terms in PREFS["sides"]["cuisine"].items() if any(has(t, title) for t in terms)}
+
+
+def fits(side, main):
+    cfg = PREFS["sides"]
+    starchy = any(has(t, side["title"]) for t in cfg["starchTerms"])
+    if starchy and re.search(cfg["mainStarchPattern"], main["title"], re.I):
+        return False
+    if side["cuisine"]:
+        return main.get("cuisine") in side["cuisine"]
+    return main.get("cuisine") is None
+
+
+def combine(a, b):
+    return {k: round(a.get(k, 0) + b.get(k, 0), 2) for k in set(a) | set(b)}
+
+
+def pair_sides(rows, sides):
+    """Attach the side that lowers a main's penalty most, if it beats minImprovement. Ranking then uses
+    the paired figures, so a main that misses fibre can rise once greens are added."""
+    gain = PREFS["sides"]["minImprovement"]
+    for r in rows:
+        r["side"], r["mainOnly"] = None, {"n": r["n"], "penalty": r["penalty"]}
+        best = None
+        for s in sides:
+            if not fits(s, r):
+                continue
+            p = penalty({**r, "n": combine(r["n"], s["n"])})
+            if best is None or p < best[0]:
+                best = (p, s)
+        if best and r["penalty"] - best[0] >= gain:
+            s = best[1]
+            r["side"] = {k: s[k] for k in ("title", "how", "pricePP", "url", "n")}
+            r["n"], r["penalty"] = combine(r["n"], s["n"]), best[0]
+            r["ingredients"] += " " + s["ingredients"]
+            r["pricePP"] = round(r["pricePP"] + s["pricePP"], 2)
 
 
 def pack_options(it):
@@ -254,7 +326,6 @@ def miss_text(r):
 
 def score_all(rows):
     for r in rows:
-        r["penalty"] = penalty(r)
         r["flags"] = flags(r)
     return sorted(rows, key=lambda r: (r["penalty"], -r["n"]["protein"]))
 
@@ -276,8 +347,12 @@ def nut_cells(r):
     return [int(n["kcal"]), n["protein"], n.get("sat"), n.get("salt"), n.get("fibre", 0), n.get("sugar")]
 
 
-def load(refresh):
+def load(refresh, with_sides=True):
     rows, skipped = enrich(catalogue(refresh), refresh)
+    for r in rows:
+        r["penalty"] = penalty(r)
+    if with_sides:
+        pair_sides(rows, side_catalogue(refresh))
     ranked = score_all(rows)
     dropped = [r for r in ranked if r["flags"]["drop"]]
     excluded = [r for r in ranked if r["kind"] in PREFS["exclude"]["proteinTypes"]]
@@ -303,9 +378,18 @@ def cmd_pick(args):
           f"Excluded {len(excluded)} ({', '.join(PREFS['exclude']['proteinTypes'])}), hard-dropped {len(dropped)}.\n")
     print(f"## Top {len(top)} (lower penalty is better; per portion; {T['proteinG']['min']}g+ protein, "
           f"<{T['satFatG']['ideal']}g sat, <{T['saltG']['ideal']}g salt, {T['fibreG']['min']}g+ fibre)\n")
-    table(["#", "Meal", "Type", "Penalty", "kcal", "Protein", "Sat", "Salt", "Fibre", "Sugar", "£/person", "Buy"],
-          [[i + 1, r["title"], r["kind"], r["penalty"], *nut_cells(r), f"{r['pricePP']:.2f}", r["how"]]
+    print("Figures include the paired side where there is one.\n")
+    table(["#", "Meal", "Side", "Type", "Penalty", "kcal", "Protein", "Sat", "Salt", "Fibre", "Sugar", "£/person", "Buy"],
+          [[i + 1, r["title"], r["side"]["title"] if r["side"] else "-", r["kind"], r["penalty"], *nut_cells(r),
+            f"{r['pricePP']:.2f}", r["how"] + (f" + {r['side']['how']}" if r["side"] else "")]
            for i, r in enumerate(top)])
+    paired = [r for r in detail if r["side"]]
+    if paired:
+        print("\n## Why these sides\n")
+        table(["Meal", "Side", "Main alone misses", "With side misses", "Side adds"],
+              [[r["title"], r["side"]["title"], miss_text(r["mainOnly"]), miss_text(r),
+                f"+{r['side']['n'].get('fibre', 0)}g fibre, +{r['side']['n'].get('protein', 0)}g protein, "
+                f"+{int(r['side']['n'].get('kcal', 0))} kcal, £{r['side']['pricePP']:.2f}/person"] for r in paired])
     print(f"\n## Top {len(detail)} with flags\n")
     table(["Meal", "Misses", "Flags", "Additives", "Processed meat", "Chilli", "Bloating watchlist"],
           [[r["title"], miss_text(r), ", ".join(r["flags"]["flag"]) or "-", ", ".join(r["flags"]["additives"]) or "-",
@@ -315,7 +399,8 @@ def cmd_pick(args):
     total = 0
     for r in final:
         total += r["pricePP"] * PREFS["plan"]["people"]
-        print(f"- **{r['title']}** ({r['how']}, £{r['pricePP'] * PREFS['plan']['people']:.2f}) - {r['url']}")
+        side = f" + **{r['side']['title']}** ({r['side']['how']}) - {r['side']['url']}" if r["side"] else ""
+        print(f"- **{r['title']}** ({r['how']}) - {r['url']}{side} - £{r['pricePP'] * PREFS['plan']['people']:.2f}")
     print(f"\nTotal for {len(final)} meals for two: £{total:.2f}")
     if dropped:
         print("\nHard-dropped: " + "; ".join(f"{r['title']} ({', '.join(r['flags']['drop'])})" for r in dropped[:10]))
@@ -323,7 +408,7 @@ def cmd_pick(args):
 
 
 def cmd_stats(args):
-    ranked, pool, *_ = load(args.refresh)
+    ranked, pool, *_ = load(args.refresh, with_sides=False)
     rows = pool
     n = len(rows)
     if not n:
