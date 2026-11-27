@@ -310,7 +310,7 @@ def flags(r):
     pr = PREFS["processing"]
     return {
         "drop": [t for t in PREFS["hardDrop"]["ingredientTerms"] if has(t, text) or has(t, r["title"])],
-        "flag": [t for t in PREFS["flagOnly"]["terms"] if has(t, text)],
+        "flag": [t for t in PREFS.get("flagOnly", {}).get("terms", []) if has(t, text)],
         "additives": [t for t in pr["additiveTerms"] if has(t, text)],
         "processedMeat": [t for t in pr["processedMeatTerms"] if has(t, text) or has(t, r["title"])],
         "watch": [g for g, ts in PREFS["bloatingWatchlist"]["groups"].items() if any(has(t, text) for t in ts)],
@@ -404,7 +404,8 @@ def cmd_pick(args):
         print(f"- **{r['title']}** ({r['how']}) - {r['url']}{side} - £{r['pricePP'] * PREFS['plan']['people']:.2f}")
     print(f"\nTotal for {len(final)} meals for two: £{total:.2f}")
     if dropped:
-        print("\nHard-dropped: " + "; ".join(f"{r['title']} ({', '.join(r['flags']['drop'])})" for r in dropped[:10]))
+        terms = Counter(t for r in dropped for t in r["flags"]["drop"])
+        print(f"\nHard-dropped {len(dropped)}: " + ", ".join(f"{t} {n}" for t, n in terms.most_common()))
     print(f"\nSaved to {run}")
 
 

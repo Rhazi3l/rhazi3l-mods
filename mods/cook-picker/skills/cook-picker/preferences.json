@@ -74,27 +74,20 @@
       "vegetarian"
     ],
     "proteinTypes_note": "[assumed] copied from gousto-picker, which skips vegetarian; remove to include them",
-    "titlePattern": "\\bkids?\\b|\\bwings\\b",
-    "titlePattern_note": "kids' meals and wings sit in the protein categories too"
+    "titlePattern": "\\bkids?\\b|\\bwings\\b|\\bparcels\\b",
+    "titlePattern_note": "kids' meals, wings and filo parcels sit in the protein categories too"
   },
   "hardDrop": {
     "ingredientTerms": [
       "prawn",
-      "cranberry"
-    ],
-    "note": "[user-set] cranberry: partner dislikes it. Applies to mains and sides, by title and ingredients"
-  },
-  "flagOnly": {
-    "terms": [
-      "red wine",
-      "balsamic",
+      "cranberry",
       "feta",
       "cucumber",
       "apple",
       "banana",
       "chickpea"
     ],
-    "note": "matched in the ingredient list; COOK meals are cooked dishes, so a match is usually structural"
+    "note": "[user-set] COOK meals are cooked, so nothing can be left out: prawn, cranberry (partner dislikes it), feta, cucumber, apple, banana and chickpea are hard drops. Applies to mains and sides, by title and ingredients"
   },
   "processing": {
     "mode": "flag-only",
@@ -249,5 +242,12 @@
     "mainStarchPattern": "rice|biryani|noodle|ramen|pasta|spaghetti|lasagne|linguine|potato|mash|couscous|pie|hotpot|gnocchi|risotto|dauphinoise",
     "starch_note": "a starchy side is not paired with a main that already has a starch in its title",
     "pairing": "[user-set] every main competes in its better form, alone or with its best side; whatever ranks in the top 10 is shown with its side"
+  },
+  "flagOnly": {
+    "terms": [
+      "red wine",
+      "balsamic"
+    ],
+    "note": "[user-set] shown in the Flags column only; often not noticeable in the finished dish"
   }
 }

@@ -23,7 +23,8 @@ Let `DIR` be the folder holding this SKILL.md. Outputs go to `~/.local/share/coo
 - Sides must suit the dish: Indian sides (naan, dhal, saag...) only with Indian mains, Asian sides (spring rolls, soy greens...) only with Thai and pan-Asian mains, plain rice with either, everything else only with the remaining mains. A starchy side is never added to a main that already has rice, pasta, potato, couscous or pastry.
 - `stats` judges mains alone, without sides.
 - If fibre is still the only miss, say a home vegetable side would cover it.
-- Prawn and cranberry are hard drops (cranberry: the user's partner dislikes it), for mains and sides alike. Flag terms, additives and processed meat are flag-only.
+- Hard drops, for mains and sides alike, matched in titles and ingredients: prawn, cranberry (the user's partner dislikes it), feta, cucumber, apple, banana and chickpea. In Gousto these could be left out while cooking; COOK meals arrive cooked, so here they are exclusions.
+- Red wine and balsamic are flag-only (often not noticeable in the finished dish), shown in the Flags column. Additives and processed meat are flag-only too.
 - The bloating watchlist only highlights. It never filters or re-ranks.
 - Chilli level is a soft penalty. The proposed 4 has at most 2 dishes of one protein, and fish only wins close calls.
 - COOK publishes no cook time, so there is no speed penalty.

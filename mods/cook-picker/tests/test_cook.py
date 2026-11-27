@@ -81,6 +81,10 @@ class Sides(unittest.TestCase):
         self.assertIsNone(full["side"])
         self.assertIsNone(fatty["side"])
 
+    def test_chickpea_is_dropped(self):
+        r = {"title": "Harissa Chicken", "ingredients": "Chicken, Chickpeas (8%), Onion"}
+        self.assertIn("chickpea", cook.flags(r)["drop"])
+
     def test_cranberry_is_dropped(self):
         r = {"title": "Turkey Crown", "ingredients": "Turkey, Cranberries (5%)"}
         self.assertIn("cranberry", cook.flags(r)["drop"])
