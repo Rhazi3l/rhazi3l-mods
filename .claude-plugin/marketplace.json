@@ -36,6 +36,11 @@
       "description": "/gousto-picker shortlists a week's Gousto recipes against your nutrition targets: top 20, then a detail check to a top 10 and a proposed 4."
     },
     {
+      "name": "cook-picker",
+      "source": "./mods/cook-picker",
+      "description": "/cook-picker shortlists COOK (cookfood.net) main meals for two against your nutrition targets: top 20, a top 10 with flags and a proposed 4."
+    },
+    {
       "name": "dashboard-polish",
       "source": "./mods/dashboard-polish",
       "description": "A skill that restyles or builds dashboards on a charcoal base with orange and cyan accents with pastel data colours and dark and light modes. Adapted from unslop (CC BY 4.0)."

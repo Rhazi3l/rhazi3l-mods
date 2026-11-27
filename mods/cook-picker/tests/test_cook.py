@@ -1,0 +1,53 @@
+import importlib.util
+import unittest
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location("cook", Path(__file__).resolve().parent.parent / "skills/cook-picker/scripts/cook.py")
+cook = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(cook)
+
+
+def nut(size_hdr, kcal, protein):
+    hdr = f"<h6>serves {size_hdr}</h6>" if size_hdr else ""
+    return (hdr + f'<table><td id="C_energyCalPortion">{kcal}</td><td id="C_proteinPortion">{protein}</td>'
+            '<td id="C_saturatesPortion">2</td><td id="C_saltPortion">1.5</td><td id="C_fibrePortion">8</td></table>')
+
+
+def page(nutrition, ingredients):
+    return ('<div class="accordion_item" id="tab3"><h3><a href="../#">Nutrition</a></h3>' + nutrition +
+            '</div><div class="accordion_item" id="tab4"><h3><a href="../#">Ingredients</a></h3>' + ingredients + '</div>')
+
+
+class Parse(unittest.TestCase):
+    def test_multi_size(self):
+        d = cook.parse_product(page(nut(1, "1,200", 30) + nut(2, 600, 35),
+                                    '<h6>serves 1</h6><p class="ingredients">Chicken, Ham</p><h6>serves 2</h6><p class="ingredients">Chicken</p>'))
+        self.assertEqual(d["nutrition"][1]["kcal"], 1200)
+        self.assertEqual(d["nutrition"][2]["protein"], 35)
+        self.assertEqual(d["ingredients"][1], "Chicken, Ham")
+
+    def test_single_size_has_no_headings(self):
+        d = cook.parse_product(page(nut(None, 500, 31), '<p class="ingredients">Lamb, <strong>[Milk]</strong></p>'))
+        self.assertEqual(cook.for_size(d["nutrition"], 1)["protein"], 31)
+        self.assertEqual(cook.for_size(d["ingredients"], 2), "Lamb, [Milk]")
+
+    def test_category_json(self):
+        html = 'x["category_7_available_products"] = {"productSections":[{"productId":3,"title":"A"},{"title":"banner"}]};\r\n'
+        self.assertEqual([p["productId"] for p in cook.category_products(html)], [3])
+
+
+class Plan(unittest.TestCase):
+    def test_two_singles_offered_alongside_serves_two(self):
+        it = {"packs": {1: {"price": 6.5, "buyable": True}, 2: {"price": 11, "buyable": True}}}
+        self.assertEqual([o[1] for o in cook.pack_options(it)], ["1 x Serves 2", "2 x Serves 1"])
+
+    def test_large_only_is_skipped(self):
+        self.assertEqual(cook.pack_options({"packs": {4: {"price": 20, "buyable": True}}}), [])
+
+    def test_penalty_zero_when_targets_met(self):
+        r = {"n": {"kcal": 500, "protein": 35, "sat": 2, "salt": 1.5, "fibre": 8, "sugar": 5}, "chilli": 0}
+        self.assertEqual(cook.penalty(r), 0)
+
+
+if __name__ == "__main__":
+    unittest.main()
